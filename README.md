@@ -71,6 +71,12 @@ pip3 install google-yubikey
     google-yubikey token -a <service_account_email>
     ```
 
+    By default, this command will generate a Google OAuth 2.0 _access token_.
+    You can also generate an _ID token_ using `-t id`.
+
+    The command prints the token to standard output, so it can
+    be easily assigned to a variable for integration into your scripts.
+
 5.  Further customization options are available through:
 
     ```
