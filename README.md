@@ -59,3 +59,10 @@ pip3 install google-yubikey
     ```
     google-yubikey [<command>] -h
     ```
+
+## Disclaimer
+
+This tool is still early on in the development.
+It works, but may have unusual edge cases that make it fail
+for your setup. Please use with caution, and raise an issue
+if you come across one.
