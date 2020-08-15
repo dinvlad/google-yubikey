@@ -4,7 +4,7 @@ Generate Google Service Account tokens with your YubiKey!
 
 ## Motivation
 
-This is perhaps the most secure way to use Google credentials
+This is perhaps the most secure way to use Google Service Account credentials
 outside of Google Cloud, since the private key never leaves the device,
 and so it cannot be leaked or stolen without physically stealing the YubiKey.
 
