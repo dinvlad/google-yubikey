@@ -281,6 +281,9 @@ def get_access_token(id_token: str):
             'assertion': id_token,
         },
     )
+    if not response.ok:
+        raise RuntimeError(response.json()['error_description'])
+
     return response.json()['access_token']
 
 
