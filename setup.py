@@ -1,9 +1,17 @@
+from os import path
 from setuptools import find_packages, setup
+
+
+current_dir = path.abspath(path.dirname(__file__))
+with open(path.join(current_dir, 'README.md'), encoding='utf-8') as f:
+    long_description = f.read()
 
 setup(
     name='google-yubikey',
     author='Denis Loginov',
     description='Generate Google Service Account tokens with your YubiKey',
+    long_description=long_description,
+    long_description_content_type='text/markdown',
     license='BSD 3-clause "New" or "Revised" License',
     url='https://github.com/dinvlad/google-yubikey',
     classifiers=[
