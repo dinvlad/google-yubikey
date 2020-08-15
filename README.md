@@ -39,13 +39,13 @@ pip3 install google-yubikey
     or to renew it after expiration:
 
     ```
-    google-yubikey private-key
+    google-yubikey generate-key
     ```
 
 3.  Run this once to register YubiKey with each Service Account:
 
     ```
-    google-yubikey public-key -a <service_account_email>
+    google-yubikey upload-key -a <service_account_email>
     ```
 
 4.  Run this every time you'd like to generate a Service Account token:
