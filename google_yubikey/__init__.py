@@ -119,11 +119,15 @@ def parse_args():
     )
     parser_generate_key.add_argument(
         '-p', '--pin-policy', type=PinPolicy.from_str(PinPolicy),
-        help='YubiKey PIN policy', default=PinPolicy.ONCE, choices=list(PinPolicy),
+        help='YubiKey PIN policy', default=PinPolicy.DEFAULT, choices=list(PinPolicy),
     )
     parser_generate_key.add_argument(
         '-t', '--touch-policy', type=TouchPolicy.from_str(TouchPolicy),
-        help='YubiKey touch policy', default=TouchPolicy.ALWAYS, choices=list(TouchPolicy),
+        help='YubiKey touch policy', default=TouchPolicy.DEFAULT, choices=list(TouchPolicy),
+    )
+    parser_generate_key.add_argument(
+        '-m', '--prompt-management-key', action='store_true',
+        help='Prompt for management key',
     )
 
     # "upload-key" action
@@ -154,8 +158,12 @@ def parse_args():
         help='Token lifetime, in seconds',
     )
     parser_token.add_argument(
-        '-t', '--token-type', type=TokenType, choices=list(TokenType),
+        '-t', '--token-type', type=TokenType.from_str(TokenType), choices=list(TokenType),
         help='Token type, in seconds', default=TokenType.ACCESS,
+    )
+    parser_token.add_argument(
+        '-m', '--prompt-management-key', action='store_true',
+        help='Prompt for management key',
     )
 
     return parser.parse_args()
@@ -167,22 +175,22 @@ def get_yubikey():
     return YubiKey(dev.driver)
 
 
-def authenticate(yubikey: YubiKey):
+def authenticate(yubikey: YubiKey, prompt_management_key: bool):
     """ Authenticates user to the YubiKey """
     print('Authenticating...')
     pin = getpass('Enter PIN: ')
     yubikey.verify(pin, touch_callback=prompt_for_touch)
 
-    mgmt_key = getpass('Enter management key [blank to use default key]: ')
-    mgmt_key = mgmt_key or DEFAULT_MANAGEMENT_KEY
+    mgmt_key = getpass('Enter management key: ') \
+        if prompt_management_key else DEFAULT_MANAGEMENT_KEY
     yubikey.authenticate(mgmt_key, touch_callback=prompt_for_touch)
 
 
-def gen_private_key(yubikey: YubiKey, slot: SLOT,
+def gen_private_key(yubikey: YubiKey, slot: SLOT, prompt_management_key: bool,
                     pin_policy: PIN_POLICY, touch_policy: TOUCH_POLICY,
                     subject: str, valid_days: int):
     """ Generates a private key and certificate on the YubiKey """
-    authenticate(yubikey)
+    authenticate(yubikey, prompt_management_key)
 
     print('Generating private key...')
     public_key = yubikey.generate_key(
@@ -231,10 +239,10 @@ def json_b64encode(obj: dict):
     return b64encode_str(json_str)
 
 
-def get_id_token(yubikey: YubiKey, slot: SLOT, service_account_email: str,
-                 scopes: List[str], token_lifetime: int):
+def get_id_token(yubikey: YubiKey, slot: SLOT, prompt_management_key: bool,
+                 service_account_email: str, scopes: List[str], token_lifetime: int):
     """ Generates a Google ID token with a YubiKey """
-    authenticate(yubikey)
+    authenticate(yubikey, prompt_management_key)
 
     iat = time()
     header = {
@@ -277,7 +285,7 @@ def main():
 
     if args.action == str(Action.GENERATE_KEY):
         gen_private_key(
-            yubikey, args.slot,
+            yubikey, args.slot, args.prompt_management_key,
             args.pin_policy, args.touch_policy,
             args.subject, args.valid_days,
         )
@@ -287,8 +295,8 @@ def main():
         print(f'Key id: {key_id}')
     else:
         id_token = get_id_token(
-            yubikey, args.slot, args.service_account_email,
-            args.scopes, args.token_lifetime,
+            yubikey, args.slot, args.prompt_management_key,
+            args.service_account_email, args.scopes, args.token_lifetime,
         )
         if args.token_type == TokenType.ACCESS:
             print(get_access_token(id_token))
