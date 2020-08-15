@@ -50,11 +50,11 @@ pip3 install google-yubikey
     ```
 
     This is needed only for initially setting up YubiKey with a Service Account.
-    Your user account must have at least `Service Account Admin role`
+    Your user account must have at least `Service Account Key Admin` role
     or `iam.serviceAccountKeys.create` permission
     on the target Service Account(s).
 
-4.  Run this once to register YubiKey with each Service Account:
+4.  Run this once to associate your YubiKey with each Service Account:
 
     ```
     google-yubikey upload-key -a <service_account_email>
