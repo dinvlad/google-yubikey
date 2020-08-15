@@ -173,7 +173,7 @@ def authenticate(yubikey: YubiKey):
     pin = getpass('Enter PIN: ')
     yubikey.verify(pin, touch_callback=prompt_for_touch)
 
-    mgmt_key = getpass('Enter management key [blank to use default key]')
+    mgmt_key = getpass('Enter management key [blank to use default key]: ')
     mgmt_key = mgmt_key or DEFAULT_MANAGEMENT_KEY
     yubikey.authenticate(mgmt_key, touch_callback=prompt_for_touch)
 
