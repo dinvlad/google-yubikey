@@ -53,7 +53,7 @@ pip3 install google-yubikey
     google-yubikey generate-key > yubikey.pem
     ```
 
-    The output `yubikey.pem` above is public - to be used in the next step.
+    The output `yubikey.pem` key above is public - to be used in the next step.
 
 3.  Install [Google Cloud SDK](https://cloud.google.com/sdk/install) and run:
 
