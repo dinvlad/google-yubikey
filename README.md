@@ -42,19 +42,39 @@ pip3 install google-yubikey
     google-yubikey generate-key
     ```
 
-3.  Run this once to register YubiKey with each Service Account:
+3.  Install and authenticate with
+    [Google Cloud SDK](https://cloud.google.com/sdk/install):
+
+    ```
+    gcloud auth application-default login
+    ```
+
+    This is needed only for initially setting up YubiKey with a Service Account.
+    Your user account must have at least `Service Account Admin role`
+    or `iam.serviceAccountKeys.create` permission
+    on the target Service Account(s).
+
+4.  Run this once to register YubiKey with each Service Account:
 
     ```
     google-yubikey upload-key -a <service_account_email>
     ```
 
-4.  Run this every time you'd like to generate a Service Account token:
+5.  As a good practice, revoke your Google Cloud SDK credentials,
+    which limits the potential for their exposure
+    only to the time of the public key upload:
+
+    ```
+    gcloud auth application-default revoke
+    ```
+
+6.  Run this every time you'd like to generate a Service Account token:
 
     ```
     google-yubikey token -a <service_account_email>
     ```
 
-5.  Further customization options are available through:
+7.  Further customization options are available through:
 
     ```
     google-yubikey [<command>] -h
