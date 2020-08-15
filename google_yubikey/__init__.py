@@ -9,49 +9,81 @@ from base64 import b64encode
 from binascii import a2b_hex
 from datetime import datetime, timedelta
 from enum import Enum
+from getpass import getpass
+from io import BytesIO
 import json
 from time import time
-from typing import List
-from getpass import getpass
+from typing import List, Optional
 import warnings
 
 import requests
+from click import Context, Command
 from cryptography.hazmat.primitives import serialization
 from googleapiclient.discovery import build as google_api
 from ykman.descriptor import open_device
-from ykman.piv import ALGO, DEFAULT_MANAGEMENT_KEY, SLOT, PivController as YubiKey
+from ykman.cli.util import prompt_for_touch
+from ykman.piv import \
+    ALGO, DEFAULT_MANAGEMENT_KEY, \
+    PIN_POLICY, TOUCH_POLICY, SLOT, PivController as YubiKey
 
 KEY_ALG = ALGO.RSA2048
 GOOGLE_OAUTH2_TOKEN_ENDPOINT = 'https://oauth2.googleapis.com/token'
 
 
-class StrEnum(Enum):
-    """ Enum with string values """
+class ArgEnum(Enum):
+    """ Enum for command-line argument choices """
 
     def __str__(self):
-        return self.value
+        return str(self.name).lower().replace('_', '-')
+
+    @staticmethod
+    def from_str(clazz):
+        """ Converts value from string """
+        def convert(str_value: str):
+            try:
+                return clazz[str_value.upper().replace('-', '_')]
+            except KeyError:
+                raise ValueError()
+        return convert
 
 
-class Command(StrEnum):
-    """ Command type """
-    PRIVATE_KEY = 'private-key'
-    PUBLIC_KEY = 'public-key'
-    TOKEN = 'token'
+class Action(ArgEnum):
+    """ Action type """
+    GENERATE_KEY = 1
+    UPLOAD_KEY = 2
+    TOKEN = 3
 
 
-class Slot(StrEnum):
+class Slot(ArgEnum):
     """ YubiKey slot type """
-    AUTHENTICATION = f'{SLOT.AUTHENTICATION:x}'
-    SIGNATURE = f'{SLOT.SIGNATURE:x}'
-    KEY_MANAGEMENT = f'{SLOT.KEY_MANAGEMENT:x}'
-    CARD_MANAGEMENT = f'{SLOT.CARD_MANAGEMENT:x}'
-    CARD_AUTH = f'{SLOT.CARD_AUTH:x}'
+    AUTHENTICATION = SLOT.AUTHENTICATION.value
+    CARD_MANAGEMENT = SLOT.CARD_MANAGEMENT.value
+    SIGNATURE = SLOT.SIGNATURE.value
+    KEY_MANAGEMENT = SLOT.KEY_MANAGEMENT.value
+    CARD_AUTH = SLOT.CARD_AUTH.value
+    ATTESTATION = SLOT.ATTESTATION.value
 
 
-class TokenType(StrEnum):
+class PinPolicy(ArgEnum):
+    """ YubiKey pin policy """
+    DEFAULT = PIN_POLICY.DEFAULT.value
+    NEVER = PIN_POLICY.NEVER.value
+    ONCE = PIN_POLICY.ONCE.value
+    ALWAYS = PIN_POLICY.ALWAYS.value
+
+
+class TouchPolicy(ArgEnum):
+    """ YubiKey touch policy """
+    DEFAULT = TOUCH_POLICY.DEFAULT.value
+    NEVER = TOUCH_POLICY.NEVER.value
+    ALWAYS = TOUCH_POLICY.ALWAYS.value
+    CACHED = TOUCH_POLICY.CACHED.value
+
+
+class TokenType(ArgEnum):
     """ Google token type """
-    ID = 'id'
-    ACCESS = 'access'
+    ID = 1
+    ACCESS = 2
 
 
 def parse_args():
@@ -63,46 +95,50 @@ def parse_args():
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument(
-        '-k', '--key-slot', dest='slot', type=Slot, choices=list(Slot),
-        help='YubiKey slot', default=Slot.AUTHENTICATION,
-    )
-    parser.add_argument(
-        '-m', '--management-key',
-        help='YubiKey management key', default=DEFAULT_MANAGEMENT_KEY.hex(),
+        '-k', '--key-slot', dest='slot', type=Slot.from_str(Slot),
+        help='YubiKey slot', default=Slot.AUTHENTICATION, choices=list(Slot),
     )
     subparsers = parser.add_subparsers(
-        dest='command', required=True,
-        help='Command',
+        dest='action', required=True,
+        help='Action',
     )
 
-    # "private-key" command
-    parser_private_key = subparsers.add_parser(
-        str(Command.PRIVATE_KEY),
+    # "generate-key" action
+    parser_generate_key = subparsers.add_parser(
+        str(Action.GENERATE_KEY),
         help='Generate private key on the YubiKey '
         '(can be used for many Service Accounts)',
     )
-    parser_private_key.add_argument(
-        '-c', '--common-name',
-        help='Certificate common name', default='yubikey',
+    parser_generate_key.add_argument(
+        '-s', '--subject',
+        help='Subject common name (CN) for the key', default='yubikey',
     )
-    parser_private_key.add_argument(
-        '-d', '--validity-days', dest='validity_days', type=int,
-        help='Certificate validity, in days', default=365,
+    parser_generate_key.add_argument(
+        '-d', '--valid-days', type=int,
+        help='Number of days until the key expires', default=365,
+    )
+    parser_generate_key.add_argument(
+        '-p', '--pin-policy', type=PinPolicy.from_str(PinPolicy),
+        help='YubiKey PIN policy', default=PinPolicy.ONCE, choices=list(PinPolicy),
+    )
+    parser_generate_key.add_argument(
+        '-t', '--touch-policy', type=TouchPolicy.from_str(TouchPolicy),
+        help='YubiKey touch policy', default=TouchPolicy.ALWAYS, choices=list(TouchPolicy),
     )
 
-    # "public-key" command
-    parser_public_key = subparsers.add_parser(
-        str(Command.PUBLIC_KEY),
-        help='Register public key of the YubiKey with a Service Account',
+    # "upload-key" action
+    parser_upload_key = subparsers.add_parser(
+        str(Action.UPLOAD_KEY),
+        help='Associate public key of the YubiKey with a Service Account',
     )
-    parser_public_key.add_argument(
+    parser_upload_key.add_argument(
         '-a', '--service-account-email', required=True,
         help='Service Account email',
     )
 
-    # "token" command
+    # "token" action
     parser_token = subparsers.add_parser(
-        str(Command.TOKEN),
+        str(Action.TOKEN),
         help='Generate a token',
     )
     parser_token.add_argument(
@@ -122,41 +158,55 @@ def parse_args():
         help='Token type, in seconds', default=TokenType.ACCESS,
     )
 
-    args = parser.parse_args()
-    setattr(args, 'slot', int(str(args.slot), 16))
-    setattr(args, 'management_key', a2b_hex(args.management_key))
-    setattr(args, 'pin', getpass('YubiKey PIN: '))
-    return args
+    return parser.parse_args()
 
 
-def get_yubikey(management_key: bytes, pin: int):
+def get_yubikey():
     """ Sets up YubiKey communication """
     dev = open_device()
-    yubikey = YubiKey(dev.driver)
-    yubikey.authenticate(management_key)
-    yubikey.verify(pin)
-    return yubikey
+    return YubiKey(dev.driver)
 
 
-def gen_private_key(yubikey: YubiKey, slot: int, common_name: str, validity_days: int):
-    """ Generates Google Service Account private key on the YubiKey """
-    print('Generating private key ...')
+def authenticate(yubikey: YubiKey):
+    """ Authenticates user to the YubiKey """
+    print('Authenticating...')
+    pin = getpass('Enter PIN: ')
+    yubikey.verify(pin, touch_callback=prompt_for_touch)
+
+    mgmt_key = getpass('Enter management key [blank to use default key]')
+    mgmt_key = mgmt_key or DEFAULT_MANAGEMENT_KEY
+    yubikey.authenticate(mgmt_key, touch_callback=prompt_for_touch)
+
+
+def gen_private_key(yubikey: YubiKey, slot: SLOT,
+                    pin_policy: PIN_POLICY, touch_policy: TOUCH_POLICY,
+                    subject: str, valid_days: int):
+    """ Generates a private key and certificate on the YubiKey """
+    authenticate(yubikey)
+
+    print('Generating private key...')
+    public_key = yubikey.generate_key(
+        slot.value, KEY_ALG, pin_policy.value, touch_policy.value,
+    )
+
+    print('Generating certificate...')
     start = datetime.now()
-    end = start + timedelta(days=validity_days)
-    key = yubikey.generate_key(slot, KEY_ALG)
+    end = start + timedelta(days=valid_days)
     yubikey.generate_self_signed_certificate(
-        slot, key, common_name, start, end,
+        slot.value, public_key, subject, start, end,
+        touch_callback=prompt_for_touch,
     )
 
 
-def get_public_key(yubikey: YubiKey, slot: int):
-    cert = yubikey.read_certificate(slot)
+def get_public_key(yubikey: YubiKey, slot: SLOT):
+    """ Reads public key from YubiKey """
+    cert = yubikey.read_certificate(slot.value)
     return cert.public_bytes(serialization.Encoding.PEM)
 
 
 def upload_pubkey(service_account_email: str, public_key: bytes):
-    """ RegistersGoogle Service Account public key """
-    print('Uploading public key ...')
+    """ Registers Google Service Account public key """
+    print('Uploading public key...')
     warnings.filterwarnings(
         "ignore", "Your application has authenticated using end user credentials"
     )
@@ -181,9 +231,11 @@ def json_b64encode(obj: dict):
     return b64encode_str(json_str)
 
 
-def get_id_token(yubikey: YubiKey, slot: int, service_account_email: str,
+def get_id_token(yubikey: YubiKey, slot: SLOT, service_account_email: str,
                  scopes: List[str], token_lifetime: int):
     """ Generates a Google ID token with a YubiKey """
+    authenticate(yubikey)
+
     iat = time()
     header = {
         'typ': 'JWT',
@@ -200,7 +252,7 @@ def get_id_token(yubikey: YubiKey, slot: int, service_account_email: str,
     }
     msg = f'{json_b64encode(header)}.{json_b64encode(payload)}'
 
-    sig = yubikey.sign(slot, KEY_ALG, msg.encode('utf-8'))
+    sig = yubikey.sign(slot.value, KEY_ALG, msg.encode('utf-8'))
     sig = b64encode_str(sig)
 
     return f'{msg}.{sig}'
@@ -221,12 +273,15 @@ def get_access_token(id_token: str):
 def main():
     """ Main entrypoint """
     args = parse_args()
-    yubikey = get_yubikey(args.management_key, args.pin)
+    yubikey = get_yubikey()
 
-    if args.command == str(Command.PRIVATE_KEY):
-        gen_private_key(yubikey, args.slot,
-                        args.common_name, args.validity_days)
-    elif args.command == str(Command.PUBLIC_KEY):
+    if args.action == str(Action.GENERATE_KEY):
+        gen_private_key(
+            yubikey, args.slot,
+            args.pin_policy, args.touch_policy,
+            args.subject, args.valid_days,
+        )
+    elif args.action == str(Action.UPLOAD_KEY):
         public_key = get_public_key(yubikey, args.slot)
         key_id = upload_pubkey(args.service_account_email, public_key)
         print(f'Key id: {key_id}')
