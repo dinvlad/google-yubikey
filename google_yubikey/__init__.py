@@ -12,6 +12,7 @@ from enum import Enum
 from getpass import getpass
 from io import BytesIO
 import json
+import sys
 from time import time
 from typing import List, Optional
 import warnings
@@ -169,6 +170,11 @@ def parse_args():
     return parser.parse_args()
 
 
+def info(message: str):
+    """ Print information for the user """
+    print(message, file=sys.stderr)
+
+
 def get_yubikey():
     """ Sets up YubiKey communication """
     dev = open_device()
@@ -177,11 +183,11 @@ def get_yubikey():
 
 def authenticate(yubikey: YubiKey, prompt_management_key: bool):
     """ Authenticates user to the YubiKey """
-    print('Authenticating...')
-    pin = getpass('Enter PIN: ')
+    info('Authenticating...')
+    pin = getpass('Enter PIN: ', stream=sys.stderr)
     yubikey.verify(pin, touch_callback=prompt_for_touch)
 
-    mgmt_key = getpass('Enter management key: ') \
+    mgmt_key = getpass('Enter management key: ', stream=sys.stderr) \
         if prompt_management_key else DEFAULT_MANAGEMENT_KEY
     yubikey.authenticate(mgmt_key, touch_callback=prompt_for_touch)
 
@@ -192,12 +198,12 @@ def gen_private_key(yubikey: YubiKey, slot: SLOT, prompt_management_key: bool,
     """ Generates a private key and certificate on the YubiKey """
     authenticate(yubikey, prompt_management_key)
 
-    print('Generating private key...')
+    info('Generating private key...')
     public_key = yubikey.generate_key(
         slot.value, KEY_ALG, pin_policy.value, touch_policy.value,
     )
 
-    print('Generating certificate...')
+    info('Generating certificate...')
     start = datetime.now()
     end = start + timedelta(days=valid_days)
     yubikey.generate_self_signed_certificate(
@@ -214,7 +220,7 @@ def get_public_key(yubikey: YubiKey, slot: SLOT):
 
 def upload_pubkey(service_account_email: str, public_key: bytes):
     """ Registers Google Service Account public key """
-    print('Uploading public key...')
+    info('Uploading public key...')
     warnings.filterwarnings(
         "ignore", "Your application has authenticated using end user credentials"
     )
@@ -292,7 +298,7 @@ def main():
     elif args.action == str(Action.UPLOAD_KEY):
         public_key = get_public_key(yubikey, args.slot)
         key_id = upload_pubkey(args.service_account_email, public_key)
-        print(f'Key id: {key_id}')
+        info(f'Key id: {key_id}')
     else:
         id_token = get_id_token(
             yubikey, args.slot, args.prompt_management_key,
