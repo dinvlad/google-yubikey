@@ -22,7 +22,18 @@ stored on their machine, and could thus be compromised.
 
 ## Requirements
 
-YubiKey 4+
+YubiKey 4+, FIPS and NEO
+
+The key must have **PIV** feature to be eligible.
+For the specific list of compatible models, please see
+[here](https://www.yubico.com/products/compare-products-series/)
+and [here](https://www.yubico.com/products/compare-yubikey-4-neo/).
+
+Please note that the private key is stored on one of the available
+[PIV certificate slots](https://developers.yubico.com/PIV/Introduction/Certificate_slots.html),
+which does _NOT_ interfere with other functionality,
+like web 2FA authentication or OpenPGP.
+You can choose the slot freely (by default, it's `9a`).
 
 ## Setup
 
