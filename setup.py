@@ -37,7 +37,6 @@ setup(
         'relative_to': __file__,
     },
     install_requires=[
-        'google-api-python-client >= 1.10.0',
         'requests >= 2.24.0',
         'yubikey-manager >= 3.1.1',
     ],

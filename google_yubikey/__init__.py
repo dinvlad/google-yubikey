@@ -18,9 +18,7 @@ from typing import List, Optional
 import warnings
 
 import requests
-from click import Context, Command
 from cryptography.hazmat.primitives import serialization
-from googleapiclient.discovery import build as google_api
 from ykman.descriptor import open_device
 from ykman.cli.util import prompt_for_touch
 from ykman.piv import \
@@ -51,7 +49,6 @@ class ArgEnum(Enum):
 class Action(ArgEnum):
     """ Action type """
     GENERATE_KEY = 1
-    UPLOAD_KEY = 2
     TOKEN = 3
 
 
@@ -131,16 +128,6 @@ def parse_args():
         help='Prompt for management key',
     )
 
-    # "upload-key" action
-    parser_upload_key = subparsers.add_parser(
-        str(Action.UPLOAD_KEY),
-        help='Associate public key of the YubiKey with a Service Account',
-    )
-    parser_upload_key.add_argument(
-        '-a', '--service-account-email', required=True,
-        help='Service Account email',
-    )
-
     # "token" action
     parser_token = subparsers.add_parser(
         str(Action.TOKEN),
@@ -210,28 +197,13 @@ def gen_private_key(yubikey: YubiKey, slot: SLOT, prompt_management_key: bool,
         slot.value, public_key, subject, start, end,
         touch_callback=prompt_for_touch,
     )
+    return get_public_key(yubikey, slot)
 
 
 def get_public_key(yubikey: YubiKey, slot: SLOT):
     """ Reads public key from YubiKey """
     cert = yubikey.read_certificate(slot.value)
     return cert.public_bytes(serialization.Encoding.PEM)
-
-
-def upload_pubkey(service_account_email: str, public_key: bytes):
-    """ Registers Google Service Account public key """
-    info('Uploading public key...')
-    warnings.filterwarnings(
-        "ignore", "Your application has authenticated using end user credentials"
-    )
-    # pylint: disable=maybe-no-member
-    response = google_api('iam', 'v1').projects().serviceAccounts().keys().upload(
-        name=f'projects/-/serviceAccounts/{service_account_email}',
-        body={
-            'publicKeyData': b64encode_str(public_key),
-        },
-    ).execute()
-    return response['name'].split('/')[-1]
 
 
 def b64encode_str(bbytes: bytes):
@@ -293,15 +265,12 @@ def main():
     yubikey = get_yubikey()
 
     if args.action == str(Action.GENERATE_KEY):
-        gen_private_key(
+        public_key = gen_private_key(
             yubikey, args.slot, args.prompt_management_key,
             args.pin_policy, args.touch_policy,
             args.subject, args.valid_days,
         )
-    elif args.action == str(Action.UPLOAD_KEY):
-        public_key = get_public_key(yubikey, args.slot)
-        key_id = upload_pubkey(args.service_account_email, public_key)
-        info(f'Key id: {key_id}')
+        print(public_key.decode('utf-8'))
     else:
         id_token = get_id_token(
             yubikey, args.slot, args.prompt_management_key,

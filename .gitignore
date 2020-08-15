@@ -2,3 +2,5 @@
 *_cache*
 *cache_*
 .vscode/*
+
+**.pem
