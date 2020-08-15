@@ -18,7 +18,9 @@ jobs:
         python-version: 3.x
 
     - name: Build distribution 📦
-      run: python3 setup.py sdist bdist_wheel
+      run: |
+        pip3 install wheel
+        python3 setup.py sdist bdist_wheel
 
     - name: Publish distribution 📦 to Test PyPI
       uses: pypa/gh-action-pypi-publish@master
