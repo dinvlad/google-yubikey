@@ -74,7 +74,9 @@ pip3 install google-yubikey
     only to the time of the public key upload.
 
     Alernatively to step 3, you can upload `yubikey.pem` from step 2 via
-    Google Cloud Console for the target Service Account(s).
+    Google Cloud Console for the target Service Account(s):
+
+    ![Uploading existing key to Google Cloud Console](console.png)
 
 4.  Run this every time you'd like to generate a Service Account token:
 
