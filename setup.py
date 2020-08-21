@@ -42,7 +42,7 @@ setup(
     ],
     entry_points={
         'console_scripts': [
-            'google-yubikey = google_yubikey.__init__:main',
+            'google-yubikey = google_yubikey.__main__:main',
         ],
     },
 )
