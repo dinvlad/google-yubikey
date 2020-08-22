@@ -85,6 +85,8 @@ class GCEMetadata:
 
     def run(self):
         """ Runs the server """
+        is_debug = getattr(logging, self.verbosity) <= logging.DEBUG
+        stderr = sys.stderr if is_debug else PIPE
         server = run([
             'uwsgi',
             '--http', '=0',
@@ -100,9 +102,9 @@ class GCEMetadata:
             '--set', f'verbosity={self.verbosity}',
             '--processes', '1',
             '--honour-stdin',
-        ], stdout=sys.stdout, stderr=PIPE, text=True, check=False)
+        ], stdout=sys.stdout, stderr=stderr, text=True, check=False)
 
-        if server.returncode != 0:
+        if not is_debug and server.returncode != 0:
             print(server.stderr)
 
 
