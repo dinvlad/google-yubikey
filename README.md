@@ -109,11 +109,11 @@ pip3 install google-yubikey
     as if you were running them on a GCE instance (!), for example:
 
     ```
-    gcloud auth revoke # revoke your user credentials first
+    gcloud config set account <service_account_email>
     gcloud auth list
     gsutil ls
     docker run --rm -it google/cloud-sdk:alpine bq ls
-    node server.js # your JavaScript app that uses Google client libraries
+    node app.js # a JavaScript app that uses Google client libraries
     ```
 
     When these commands request a token from the metadata server (behind the scenes),
