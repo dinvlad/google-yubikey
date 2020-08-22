@@ -137,6 +137,10 @@ def parse_args():
         help='Service Account email',
     )
     parser_token.add_argument(
+        '-t', '--token-type', type=TokenType.from_str(TokenType), choices=list(TokenType),
+        help='Token type', default=TokenType.ACCESS,
+    )
+    parser_token.add_argument(
         '-d', '--audience',
         help='Audience for ID token',
     )
@@ -147,10 +151,6 @@ def parse_args():
     parser_token.add_argument(
         '-l', '--token-lifetime', type=int, default=DEFAULT_LIFETIME,
         help='Token lifetime, in seconds',
-    )
-    parser_token.add_argument(
-        '-t', '--token-type', type=TokenType.from_str(TokenType), choices=list(TokenType),
-        help='Token type, in seconds', default=TokenType.ACCESS,
     )
     parser_token.add_argument(
         '-m', '--prompt-management-key', action='store_true',
