@@ -22,6 +22,8 @@ stored on their machine, and could thus be compromised.
 
 ## Requirements
 
+Python 3.7+
+
 YubiKey 4+, FIPS and NEO
 
 The key must have **PIV** feature to be eligible.
