@@ -55,11 +55,11 @@ def authenticate(yubikey: YubiKey, prompt_management_key: bool,
     yubikey.verify(pin, touch_callback=prompt_for_touch)
 
     mgmt_key = _CACHED_MGMT_KEY.value
-    if prompt_management_key and _CACHED_MGMT_KEY.expired():
+    if not prompt_management_key:
+        mgmt_key = DEFAULT_MANAGEMENT_KEY
+    elif _CACHED_MGMT_KEY.expired():
         mgmt_key = getpass('Enter management key: ', stream)
         _CACHED_MGMT_KEY = CachedItem(None, mgmt_key, cache_lifetime)
-    else:
-        mgmt_key = DEFAULT_MANAGEMENT_KEY
     yubikey.authenticate(mgmt_key, touch_callback=prompt_for_touch)
 
 
