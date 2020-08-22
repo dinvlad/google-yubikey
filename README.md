@@ -97,7 +97,7 @@ pip3 install google-yubikey
     Google Compute Engine (GCE) environment for token generation:
 
     ```
-    sudo google_yubikey serve -a <service_account_email> -n <numeric_project_id>
+    sudo google-yubikey serve -a <service_account_email> -n <numeric_project_id>
     ```
 
     Unfortunately, this command needs to be run with _elevated privileges_,
