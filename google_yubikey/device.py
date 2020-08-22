@@ -131,6 +131,8 @@ def get_id_token(yubikey: YubiKey, slot: int, prompt_management_key: bool,
                  service_account_email: str, audience: str,
                  token_lifetime: int, stream=sys.stderr):
     """ Generates a Google ID token with a YubiKey """
+    if not audience:
+        raise ValueError('ID tokens must use a non-empty audience')
     return _get_jwt(
         yubikey, slot, prompt_management_key,
         service_account_email, audience, [], token_lifetime, stream,
