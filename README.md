@@ -99,12 +99,12 @@ pip3 install google-yubikey
     ```
 
     Unfortunately, this command needs to be run with _elevated privileges_,
-    since it opens privileged port 80 on your "link-local alias IP",
+    since it opens privileged port 80 on a _link-local alias IP_,
     to emulate GCE. However, according to security best practices,
     it drops privileges for the server workers.
 
     Once the server is running, you can use regular commands
-    as if you were running them on a Compute Engine instance (!), for example:
+    as if you were running them on a GCE instance (!), for example:
 
     ```
     gcloud auth revoke # revoke your user credentials first
@@ -114,7 +114,7 @@ pip3 install google-yubikey
     node server.js # your JavaScript app that uses Google client libraries
     ```
 
-    When these commands request a token from the metadata server,
+    When these commands request a token from the metadata server (behind the scenes),
     it will ask you for the YubiKey PIN, and cache it
     and the token for a short time to improve user experience.
 
