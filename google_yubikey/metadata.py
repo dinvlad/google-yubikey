@@ -90,7 +90,6 @@ class GCEMetadata:
             '--http', '=0',
             '--shared-socket', GCEMetadata.IP + ':80',
             '--uid', 'nobody', '--gid', 'nobody',
-            '--manage-script-name',
             '--wsgi', 'google_yubikey.metadata:create_uwsgi_app()',
             '--set', f'slot={self.slot.value}',
             '--set', f'prompt_management_key={self.prompt_management_key}',
