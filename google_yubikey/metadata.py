@@ -216,12 +216,12 @@ def create_uwsgi_app():
         log.debug(request.method + ' ' + request.path)
         if request.path == '/':
             return None
-        elif request.headers.get('X-Forwarded-For') or \
-                request.headers.get('Metadata-Flavor') != 'Google' or \
-                request.headers.get('Host') not in GCEMetadata.HOSTS + [GCEMetadata.IP]:
+        headers = request.headers
+        if headers.get('X-Forwarded-For') or \
+                headers.get('Metadata-Flavor') != 'Google' or \
+                headers.get('Host') not in GCEMetadata.HOSTS + [GCEMetadata.IP]:
             return abort(401)
-        else:
-            return None
+        return None
 
     @app.after_request
     def _add_response_headers(response: Response):
