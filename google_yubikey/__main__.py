@@ -1,32 +1,19 @@
 #!/usr/bin/env python3
 """
-This module allows one to use a YubiKey
-to generate Google Service Account tokens.
+Command-line interface to set up and use a YubiKey
+as a Google Service Account key.
 """
 
 import argparse
-from base64 import b64encode
-from binascii import a2b_hex
-from datetime import datetime, timedelta
 from enum import Enum
-from getpass import getpass
-from io import BytesIO
-import json
-import sys
-from time import time
-from typing import List, Optional
-import warnings
+import logging
 
-import requests
-from cryptography.hazmat.primitives import serialization
-from ykman.descriptor import open_device
-from ykman.cli.util import prompt_for_touch
-from ykman.piv import \
-    ALGO, DEFAULT_MANAGEMENT_KEY, \
-    PIN_POLICY, TOUCH_POLICY, SLOT, PivController as YubiKey
+from ykman.piv import PIN_POLICY, TOUCH_POLICY, SLOT
 
-KEY_ALG = ALGO.RSA2048
-GOOGLE_OAUTH2_TOKEN_ENDPOINT = 'https://oauth2.googleapis.com/token'
+from google_yubikey.device import \
+    get_yubikey, gen_private_key, get_access_token, get_id_token,\
+    DEFAULT_LIFETIME, DEFAULT_SCOPES
+from google_yubikey.metadata import get_gce_metadata
 
 
 class ArgEnum(Enum):
@@ -41,15 +28,16 @@ class ArgEnum(Enum):
         def convert(str_value: str):
             try:
                 return clazz[str_value.upper().replace('-', '_')]
-            except KeyError:
-                raise ValueError()
+            except KeyError as error:
+                raise ValueError() from error
         return convert
 
 
 class Action(ArgEnum):
     """ Action type """
     GENERATE_KEY = 1
-    TOKEN = 3
+    TOKEN = 2
+    SERVE = 3
 
 
 class Slot(ArgEnum):
@@ -82,6 +70,16 @@ class TokenType(ArgEnum):
     """ Google token type """
     ID = 1
     ACCESS = 2
+
+
+class Verbosity(ArgEnum):
+    """ Google token type """
+    CRITICAL = logging.CRITICAL
+    ERROR = logging.ERROR
+    WARNING = logging.WARNING
+    INFO = logging.INFO
+    DEBUG = logging.DEBUG
+    NONE = logging.NOTSET
 
 
 def parse_args():
@@ -138,11 +136,15 @@ def parse_args():
         help='Service Account email',
     )
     parser_token.add_argument(
-        '-s', '--scopes', nargs='*', default=['cloud-platform'],
-        help='Google Cloud scope(s)',
+        '-d', '--audience',
+        help='Audience for ID token',
     )
     parser_token.add_argument(
-        '-l', '--token-lifetime', type=int, default=3600,
+        '-s', '--scopes', nargs='*', default=DEFAULT_SCOPES,
+        help='Google Cloud access token scope(s)',
+    )
+    parser_token.add_argument(
+        '-l', '--token-lifetime', type=int, default=DEFAULT_LIFETIME,
         help='Token lifetime, in seconds',
     )
     parser_token.add_argument(
@@ -154,132 +156,62 @@ def parse_args():
         help='Prompt for management key',
     )
 
+    # "serve" action
+    parser_serve = subparsers.add_parser(
+        str(Action.SERVE),
+        help='Start a server that provides application default credentials',
+    )
+    parser_serve.add_argument(
+        '-n', '--numeric-project-id', type=int, required=True,
+        help='Google Cloud numeric project id',
+    )
+    parser_serve.add_argument(
+        '-a', '--service-account-email', required=True,
+        help='Service Account email',
+    )
+    parser_serve.add_argument(
+        '-l', '--token-lifetime', type=int, default=DEFAULT_LIFETIME,
+        help='Token lifetime, in seconds',
+    )
+    parser_serve.add_argument(
+        '-m', '--prompt-management-key', action='store_true',
+        help='Prompt for management key',
+    )
+    parser_serve.add_argument(
+        '-v', '--verbosity', type=Verbosity.from_str(Verbosity), choices=list(Verbosity),
+        help='Prompt for management key', default=Verbosity.INFO,
+    )
+
     return parser.parse_args()
-
-
-def info(message: str):
-    """ Print information for the user """
-    print(message, file=sys.stderr)
-
-
-def get_yubikey():
-    """ Sets up YubiKey communication """
-    dev = open_device()
-    return YubiKey(dev.driver)
-
-
-def authenticate(yubikey: YubiKey, prompt_management_key: bool):
-    """ Authenticates user to the YubiKey """
-    info('Authenticating...')
-    pin = getpass('Enter PIN: ', stream=sys.stderr)
-    yubikey.verify(pin, touch_callback=prompt_for_touch)
-
-    mgmt_key = getpass('Enter management key: ', stream=sys.stderr) \
-        if prompt_management_key else DEFAULT_MANAGEMENT_KEY
-    yubikey.authenticate(mgmt_key, touch_callback=prompt_for_touch)
-
-
-def gen_private_key(yubikey: YubiKey, slot: SLOT, prompt_management_key: bool,
-                    pin_policy: PIN_POLICY, touch_policy: TOUCH_POLICY,
-                    subject: str, valid_days: int):
-    """ Generates a private key and certificate on the YubiKey """
-    authenticate(yubikey, prompt_management_key)
-
-    info('Generating private key...')
-    public_key = yubikey.generate_key(
-        slot.value, KEY_ALG, pin_policy.value, touch_policy.value,
-    )
-
-    info('Generating certificate...')
-    start = datetime.now()
-    end = start + timedelta(days=valid_days)
-    yubikey.generate_self_signed_certificate(
-        slot.value, public_key, subject, start, end,
-        touch_callback=prompt_for_touch,
-    )
-    return get_public_key(yubikey, slot)
-
-
-def get_public_key(yubikey: YubiKey, slot: SLOT):
-    """ Reads public key from YubiKey """
-    cert = yubikey.read_certificate(slot.value)
-    return cert.public_bytes(serialization.Encoding.PEM)
-
-
-def b64encode_str(bbytes: bytes):
-    """ Encodes bytes as base64 string """
-    return b64encode(bbytes).decode('utf-8')
-
-
-def json_b64encode(obj: dict):
-    """ Converts a dict to a base64-encoded JSON string """
-    json_str = json.dumps(obj, separators=(',', ':')).encode('utf-8')
-    return b64encode_str(json_str)
-
-
-def get_id_token(yubikey: YubiKey, slot: SLOT, prompt_management_key: bool,
-                 service_account_email: str, scopes: List[str], token_lifetime: int):
-    """ Generates a Google ID token with a YubiKey """
-    authenticate(yubikey, prompt_management_key)
-
-    iat = time()
-    header = {
-        'typ': 'JWT',
-        'alg': 'RS256',
-    }
-    payload = {
-        'iss': service_account_email,
-        'aud': GOOGLE_OAUTH2_TOKEN_ENDPOINT,
-        'iat': iat,
-        'exp': iat + token_lifetime,
-        'scope': ' '.join((
-            f'https://www.googleapis.com/auth/{s}' for s in scopes
-        )),
-    }
-    msg = f'{json_b64encode(header)}.{json_b64encode(payload)}'
-
-    sig = yubikey.sign(slot.value, KEY_ALG, msg.encode('utf-8'))
-    sig = b64encode_str(sig)
-
-    return f'{msg}.{sig}'
-
-
-def get_access_token(id_token: str):
-    """ Generates a Google Access token from a Google ID token """
-    response = requests.post(
-        url=GOOGLE_OAUTH2_TOKEN_ENDPOINT,
-        data={
-            'grant_type': 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-            'assertion': id_token,
-        },
-    )
-    if not response.ok:
-        raise RuntimeError(response.json()['error_description'])
-
-    return response.json()['access_token']
 
 
 def main():
     """ Main entrypoint """
     args = parse_args()
-    yubikey = get_yubikey()
 
     if args.action == str(Action.GENERATE_KEY):
         public_key = gen_private_key(
-            yubikey, args.slot, args.prompt_management_key,
+            get_yubikey(), args.slot, args.prompt_management_key,
             args.pin_policy, args.touch_policy,
             args.subject, args.valid_days,
         )
         print(public_key.decode('utf-8'))
-    else:
-        id_token = get_id_token(
-            yubikey, args.slot, args.prompt_management_key,
-            args.service_account_email, args.scopes, args.token_lifetime,
-        )
+    elif args.action == str(Action.TOKEN):
         if args.token_type == TokenType.ACCESS:
-            print(get_access_token(id_token))
+            print(get_access_token(
+                get_yubikey(), args.slot.value, args.prompt_management_key,
+                args.service_account_email, args.scopes, args.token_lifetime,
+            )['access_token'])
         else:
-            print(id_token)
+            print(get_id_token(
+                get_yubikey(), args.slot.value, args.prompt_management_key,
+                args.service_account_email, args.audience, args.token_lifetime,
+            ))
+    elif args.action == str(Action.SERVE):
+        get_gce_metadata(
+            args.slot, args.prompt_management_key, args.numeric_project_id,
+            args.service_account_email, args.token_lifetime, args.verbosity.name,
+        ).run()
 
 
 if __name__ == "__main__":

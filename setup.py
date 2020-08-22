@@ -37,7 +37,10 @@ setup(
         'relative_to': __file__,
     },
     install_requires=[
+        'flask >= 1.1.2',
+        'python-hosts >= 1.0.0',
         'requests >= 2.24.0',
+        'uwsgi >= 2.0.19.1',
         'yubikey-manager >= 3.1.1',
     ],
     entry_points={
