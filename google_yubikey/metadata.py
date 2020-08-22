@@ -82,7 +82,6 @@ class GCEMetadata:
         hosts.remove_all_matching(GCEMetadata.IP)
         hosts.write()
 
-    # @staticmethod
     def run(self):
         """ Runs the server """
         server = run([
