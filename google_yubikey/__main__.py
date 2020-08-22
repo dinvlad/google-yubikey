@@ -175,16 +175,16 @@ def parse_args():
         help='Token lifetime, in seconds',
     )
     parser_serve.add_argument(
-        '-m', '--prompt-management-key', action='store_true',
-        help='Prompt for management key',
-    )
-    parser_serve.add_argument(
         '-c', '--cache-lifetime', type=int, default=CachedItem.DEFAULT_LIFETIME_SEC,
         help='Token/PIN cache lifetime, in seconds',
     )
     parser_serve.add_argument(
+        '-m', '--prompt-management-key', action='store_true',
+        help='Prompt for management key',
+    )
+    parser_serve.add_argument(
         '-v', '--verbosity', type=Verbosity.from_str(Verbosity), choices=list(Verbosity),
-        help='Prompt for management key', default=Verbosity.INFO,
+        help='Log verbosity level', default=Verbosity.INFO,
     )
 
     return parser.parse_args()
