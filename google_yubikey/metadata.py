@@ -38,12 +38,13 @@ class GCEMetadata:
 
     def __init__(self, slot: SLOT, prompt_management_key: bool,
                  numeric_project_id: int, service_account_email: str,
-                 token_lifetime: int, verbosity: str):
+                 token_lifetime: int, cache_lifetime: int, verbosity: str):
         self.slot = slot
         self.prompt_management_key = prompt_management_key
         self.numeric_project_id = numeric_project_id
         self.service_account_email = service_account_email
         self.token_lifetime = token_lifetime
+        self.cache_lifetime = cache_lifetime
         self.verbosity = verbosity
 
         self.add_ip()
@@ -96,6 +97,7 @@ class GCEMetadata:
             '--set', f'numeric_project_id={self.numeric_project_id}',
             '--set', f'service_account_email={self.service_account_email}',
             '--set', f'token_lifetime={self.token_lifetime}',
+            '--set', f'cache_lifetime={self.cache_lifetime}',
             '--set', f'verbosity={self.verbosity}',
             '--processes', '1',
             '--honour-stdin',
@@ -143,7 +145,8 @@ class GCEMetadataMacOS(GCEMetadata):
 
 def get_gce_metadata(slot: SLOT, prompt_management_key: bool,
                      numeric_project_id: int, service_account_email: str,
-                     token_lifetime: int, verbosity: str) -> GCEMetadata:
+                     token_lifetime: int, cache_lifetime: int,
+                     verbosity: str) -> GCEMetadata:
     """ Returns GCEMetadata instance for your OS """
     os_name = platform.system()
     metadata_type: Type[GCEMetadata]
@@ -155,7 +158,7 @@ def get_gce_metadata(slot: SLOT, prompt_management_key: bool,
         raise NotImplementedError('Sorry, your OS is not supported yet')
     return metadata_type(
         slot, prompt_management_key, numeric_project_id,
-        service_account_email, token_lifetime, verbosity,
+        service_account_email, token_lifetime, cache_lifetime, verbosity,
     )
 
 
@@ -174,6 +177,7 @@ class UWSGIOpts:
         self.project_id = self.service_account_email \
             .split('@')[1].split('.')[0]
         self.token_lifetime = int(self._get('token_lifetime'))
+        self.cache_lifetime = int(self._get('cache_lifetime'))
         self.verbosity = self._get('verbosity')
 
     def _get(self, name: str):
@@ -296,10 +300,10 @@ def create_uwsgi_app():
             return _CACHED_IDENTITY.value
         response = get_id_token(
             yubikey, opts.slot, opts.prompt_management_key,
-            opts.service_account_email, audience, opts.token_lifetime,
-            stream=sys.stdout,
+            opts.service_account_email, audience,
+            opts.token_lifetime, opts.cache_lifetime, sys.stdout,
         )
-        _CACHED_IDENTITY = CachedItem(audience, response)
+        _CACHED_IDENTITY = CachedItem(audience, response, opts.cache_lifetime)
         return response
 
     @app.route(_SA_ROOT + f'/{opts.service_account_email}/scopes')
@@ -322,10 +326,10 @@ def create_uwsgi_app():
 
         response = get_access_token(
             yubikey, opts.slot, opts.prompt_management_key,
-            opts.service_account_email, scopes, opts.token_lifetime,
-            stream=sys.stdout,
+            opts.service_account_email, scopes,
+            opts.token_lifetime, opts.cache_lifetime, sys.stdout,
         )
-        _CACHED_TOKEN = CachedItem(scopes, response)
+        _CACHED_TOKEN = CachedItem(scopes, response, opts.cache_lifetime)
         return response
 
     return app

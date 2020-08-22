@@ -14,6 +14,7 @@ from google_yubikey.device import \
     get_yubikey, gen_private_key, get_access_token, get_id_token,\
     DEFAULT_LIFETIME, DEFAULT_SCOPES
 from google_yubikey.metadata import get_gce_metadata
+from google_yubikey.util import CachedItem
 
 
 class ArgEnum(Enum):
@@ -178,6 +179,10 @@ def parse_args():
         help='Prompt for management key',
     )
     parser_serve.add_argument(
+        '-c', '--cache-lifetime', type=int, default=CachedItem.DEFAULT_LIFETIME_SEC,
+        help='Token/PIN cache lifetime, in seconds',
+    )
+    parser_serve.add_argument(
         '-v', '--verbosity', type=Verbosity.from_str(Verbosity), choices=list(Verbosity),
         help='Prompt for management key', default=Verbosity.INFO,
     )
@@ -210,7 +215,8 @@ def main():
     elif args.action == str(Action.SERVE):
         get_gce_metadata(
             args.slot, args.prompt_management_key, args.numeric_project_id,
-            args.service_account_email, args.token_lifetime, args.verbosity.name,
+            args.service_account_email, args.token_lifetime, args.cache_lifetime,
+            args.verbosity.name,
         ).run()
 
 

@@ -41,7 +41,8 @@ _CACHED_PIN = CachedItem()
 _CACHED_MGMT_KEY = CachedItem()
 
 
-def authenticate(yubikey: YubiKey, prompt_management_key: bool, stream=sys.stderr):
+def authenticate(yubikey: YubiKey, prompt_management_key: bool,
+                 cache_lifetime=CachedItem.DEFAULT_LIFETIME_SEC, stream=sys.stderr):
     """ Authenticates user to the YubiKey """
     global _CACHED_PIN, _CACHED_MGMT_KEY  # pylint: disable=global-statement
 
@@ -50,13 +51,13 @@ def authenticate(yubikey: YubiKey, prompt_management_key: bool, stream=sys.stder
     pin = _CACHED_PIN.value
     if _CACHED_PIN.expired():
         pin = getpass('Enter PIN: ', stream)
-        _CACHED_PIN = CachedItem(None, pin)
+        _CACHED_PIN = CachedItem(None, pin, cache_lifetime)
     yubikey.verify(pin, touch_callback=prompt_for_touch)
 
     mgmt_key = _CACHED_MGMT_KEY.value
     if prompt_management_key and _CACHED_MGMT_KEY.expired():
         mgmt_key = getpass('Enter management key: ', stream)
-        _CACHED_MGMT_KEY = CachedItem(None, mgmt_key)
+        _CACHED_MGMT_KEY = CachedItem(None, mgmt_key, cache_lifetime)
     else:
         mgmt_key = DEFAULT_MANAGEMENT_KEY
     yubikey.authenticate(mgmt_key, touch_callback=prompt_for_touch)
@@ -102,9 +103,9 @@ def _json_b64encode(obj: dict):
 
 def _get_jwt(yubikey: YubiKey, slot: int, prompt_management_key: bool,
              service_account_email: str, audience: str, scopes: List[str],
-             token_lifetime: int,  stream=sys.stderr):
+             token_lifetime: int, cache_lifetime: int, stream=sys.stderr):
     """ Generates a general-purpose Google JWT with a YubiKey """
-    authenticate(yubikey, prompt_management_key, stream)
+    authenticate(yubikey, prompt_management_key, cache_lifetime, stream)
 
     iat = time()
     header = {
@@ -128,25 +129,26 @@ def _get_jwt(yubikey: YubiKey, slot: int, prompt_management_key: bool,
 
 
 def get_id_token(yubikey: YubiKey, slot: int, prompt_management_key: bool,
-                 service_account_email: str, audience: str,
-                 token_lifetime: int, stream=sys.stderr):
+                 service_account_email: str, audience: str, token_lifetime: int,
+                 cache_lifetime=CachedItem.DEFAULT_LIFETIME_SEC, stream=sys.stderr):
     """ Generates a Google ID token with a YubiKey """
     if not audience:
         raise ValueError('ID tokens must use a non-empty audience')
     return _get_jwt(
         yubikey, slot, prompt_management_key,
-        service_account_email, audience, [], token_lifetime, stream,
+        service_account_email, audience, [],
+        token_lifetime, cache_lifetime, stream,
     )
 
 
 def get_access_token(yubikey: YubiKey, slot: int, prompt_management_key: bool,
-                     service_account_email: str, scopes: List[str],
-                     token_lifetime: int,  stream=sys.stderr):
+                     service_account_email: str, scopes: List[str], token_lifetime: int,
+                     cache_lifetime=CachedItem.DEFAULT_LIFETIME_SEC, stream=sys.stderr):
     """ Generates a Google Access token with a YubiKey """
     assertion = _get_jwt(
         yubikey, slot, prompt_management_key,
         service_account_email, _GOOGLE_OAUTH2_TOKEN_ENDPOINT, scopes,
-        token_lifetime, stream,
+        token_lifetime, cache_lifetime, stream,
     )
     response = requests.post(
         url=_GOOGLE_OAUTH2_TOKEN_ENDPOINT,
