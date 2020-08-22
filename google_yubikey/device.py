@@ -26,15 +26,18 @@ DEFAULT_SCOPES = ['https://www.googleapis.com/auth/cloud-platform']
 DEFAULT_LIFETIME = 3600
 
 
-def _info(message: str, file=sys.stderr):
+def _log(message: str, file=sys.stderr):
     """ Print information for the user """
     print(message, file=file)
 
 
-def get_yubikey():
+def get_yubikey(stream=sys.stderr):
     """ Sets up YubiKey communication """
+    _log('Connecting to the YubiKey...', stream)
     dev = open_device()
-    return YubiKey(dev.driver)
+    yubikey = YubiKey(dev.driver)
+    _log('Connected', stream)
+    return yubikey
 
 
 _CACHED_PIN = CachedItem()
@@ -46,7 +49,7 @@ def authenticate(yubikey: YubiKey, prompt_management_key: bool,
     """ Authenticates user to the YubiKey """
     global _CACHED_PIN, _CACHED_MGMT_KEY  # pylint: disable=global-statement
 
-    _info('Authenticating to the YubiKey...', stream)
+    _log('Authenticating to the YubiKey...', stream)
 
     pin = _CACHED_PIN.value
     if _CACHED_PIN.expired():
@@ -62,6 +65,8 @@ def authenticate(yubikey: YubiKey, prompt_management_key: bool,
         _CACHED_MGMT_KEY = CachedItem(None, mgmt_key, cache_lifetime)
     yubikey.authenticate(mgmt_key, touch_callback=prompt_for_touch)
 
+    _log('Authenticated', stream)
+
 
 def gen_private_key(yubikey: YubiKey, slot: SLOT, prompt_management_key: bool,
                     pin_policy: PIN_POLICY, touch_policy: TOUCH_POLICY,
@@ -69,12 +74,12 @@ def gen_private_key(yubikey: YubiKey, slot: SLOT, prompt_management_key: bool,
     """ Generates a private key and certificate on the YubiKey """
     authenticate(yubikey, prompt_management_key)
 
-    _info('Generating private key on YubiKey...')
+    _log('Generating private key on YubiKey...')
     public_key = yubikey.generate_key(
         slot.value, _KEY_ALG, pin_policy.value, touch_policy.value,
     )
 
-    _info('Generating certificate on YubiKey...')
+    _log('Generating certificate on YubiKey...')
     start = datetime.now()
     end = start + timedelta(days=valid_days)
     yubikey.generate_self_signed_certificate(

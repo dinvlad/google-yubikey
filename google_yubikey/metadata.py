@@ -208,7 +208,7 @@ def create_uwsgi_app():
     """ Sets up uWSGI app for GCE metadata server """
     opts = UWSGIOpts()
     log = _get_log('gce_metadata', opts.verbosity)
-    yubikey = get_yubikey()
+    yubikey = get_yubikey(sys.stdout)
     app = Flask(__name__)
 
     @app.before_request
