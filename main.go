@@ -19,10 +19,14 @@ var (
 	serial    *uint
 	subject   *string
 	validDays *int
-	account   *string
-	tokType   *string
-	audience  *string
-	scopes    []string
+
+	account  *string
+	tokType  *string
+	audience *string
+	scopes   []string
+
+	nProjectID *uint64
+	addr       *string
 )
 
 func usage() {
@@ -56,8 +60,8 @@ func main() {
 			`(default: "https://www.googleapis.com/auth/cloud-platform")`, parseScopes)
 	case "serve":
 		account = fs.String("account", "", "Service Account email (required)")
-		fs.Uint64("numeric-project-id", 0, "numeric project id")
-		fs.String("addr", "127.0.0.1:1692", "listen address")
+		nProjectID = fs.Uint64("numeric-project-id", 0, "numeric project id")
+		addr = fs.String("addr", "127.0.0.1:1692", "listen address")
 	case "-h", "-help", "--help":
 		fs.Usage()
 		return
@@ -85,7 +89,7 @@ func main() {
 		if err = requireAccount(fs); err != nil {
 			break
 		}
-		err = fmt.Errorf("%s: not implemented", cmd)
+		err = serve(*account, *nProjectID, *addr)
 	}
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
