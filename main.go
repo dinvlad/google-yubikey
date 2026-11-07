@@ -57,7 +57,6 @@ func main() {
 	case "serve":
 		account = fs.String("account", "", "Service Account email (required)")
 		fs.Uint64("numeric-project-id", 0, "numeric project id")
-		fs.Int("cache-lifetime", 10, "cache lifetime")
 		fs.String("addr", "127.0.0.1:1692", "listen address")
 	case "-h", "-help", "--help":
 		fs.Usage()
@@ -79,7 +78,7 @@ func main() {
 			break
 		}
 		var tok string
-		if tok, err = generateToken(*serial, *account, tokenType(*tokType), *audience, scopes, 3600); err == nil {
+		if tok, err = generateToken(*serial, *account, tokenType(*tokType), *audience, scopes); err == nil {
 			fmt.Println(tok)
 		}
 	case "serve":

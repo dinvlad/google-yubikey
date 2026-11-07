@@ -24,7 +24,7 @@ const (
 )
 
 // generateToken creates an access or ID token for the service account.
-func generateToken(serial uint, account string, typ tokenType, audience string, scopes []string, lifetime int) (string, error) {
+func generateToken(serial uint, account string, typ tokenType, audience string, scopes []string) (string, error) {
 	switch typ {
 	case AccessToken:
 		if audience != "" {
@@ -54,7 +54,7 @@ func generateToken(serial uint, account string, typ tokenType, audience string, 
 		return "", err
 	}
 
-	jwt, err := signJWT(sign, account, audience, scopes, lifetime)
+	jwt, err := signJWT(sign, account, audience, scopes)
 	if err != nil {
 		return "", err
 	}
@@ -94,7 +94,7 @@ type jwtClaims struct {
 }
 
 // signJWT returns a signed RS256 JWT for the given issuer, audience and scopes.
-func signJWT(sign crypto.Signer, iss, aud string, scopes []string, lifetime int) (string, error) {
+func signJWT(sign crypto.Signer, iss, aud string, scopes []string) (string, error) {
 	now := time.Now().Unix()
 
 	header, err := json.Marshal(jwtHeader{"JWT", "RS256"})
@@ -102,7 +102,7 @@ func signJWT(sign crypto.Signer, iss, aud string, scopes []string, lifetime int)
 		return "", err
 	}
 
-	c := jwtClaims{iss, aud, now, now + int64(lifetime), strings.Join(scopes, " ")}
+	c := jwtClaims{iss, aud, now, now + 3600, strings.Join(scopes, " ")}
 	claims, err := json.Marshal(c)
 	if err != nil {
 		return "", err
