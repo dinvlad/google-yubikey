@@ -11,13 +11,17 @@ import (
 	"github.com/go-piv/piv-go/v2/piv"
 )
 
-const usage = "usage: google-yubikey <generate-key|token|serve> [flags]"
+const (
+	usage = "usage: google-yubikey <generate-key|token|serve> [flags]"
+
+	defaultScope = "https://www.googleapis.com/auth/cloud-platform"
+)
 
 var (
 	slot        = piv.SlotAuthentication
 	pinPolicy   = piv.PINPolicyOnce
 	touchPolicy = piv.TouchPolicyNever
-	scopes      []string
+	scopes      = []string{defaultScope}
 )
 
 func main() {
@@ -110,9 +114,14 @@ func parseTouchPolicy(s string) error {
 }
 
 func parseScopes(s string) error {
-	scopes = strings.Split(s, ",")
+	scopes = nil
+	for v := range strings.SplitSeq(s, ",") {
+		if v = strings.TrimSpace(v); v != "" {
+			scopes = append(scopes, v)
+		}
+	}
 	if len(scopes) == 0 {
-		scopes = []string{"https://www.googleapis.com/auth/cloud-platform"}
+		scopes = []string{defaultScope}
 	}
 	return nil
 }
