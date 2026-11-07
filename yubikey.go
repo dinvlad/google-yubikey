@@ -1,11 +1,17 @@
 package main
 
 import (
+	"crypto"
+	"crypto/rand"
+	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"math/big"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/go-piv/piv-go/v2/piv"
 	"golang.org/x/term"
@@ -67,4 +73,25 @@ func promptPIN() (string, error) {
 		return "", err
 	}
 	return strings.TrimSpace(string(b)), nil
+}
+
+// generateCert builds and signs a self-signed certificate.
+func generateCert(subject string, validDays int, pub crypto.PublicKey, sign crypto.Signer) (*x509.Certificate, error) {
+	now := time.Now()
+	serial, err := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 159))
+	if err != nil {
+		return nil, err
+	}
+	tmpl := &x509.Certificate{
+		SerialNumber: serial,
+		Subject:      pkix.Name{CommonName: subject},
+		NotBefore:    now.Add(-time.Minute),
+		NotAfter:     now.AddDate(0, 0, validDays),
+		KeyUsage:     x509.KeyUsageDigitalSignature,
+	}
+	der, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, pub, sign)
+	if err != nil {
+		return nil, err
+	}
+	return x509.ParseCertificate(der)
 }
