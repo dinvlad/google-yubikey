@@ -6,12 +6,51 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/go-piv/piv-go/v2/piv"
 )
+
+type tokenType string
+
+const (
+	IDToken     tokenType = "id"
+	AccessToken tokenType = "access"
+)
+
+// token generates an access or ID token for the service account.
+func token(serial uint, account, typ, audience string, lifetime int) (string, error) {
+	if account == "" {
+		return "", errors.New("Service Account email is required")
+	}
+
+	switch tokenType(typ) {
+	case AccessToken:
+		return "", errors.New("access tokens are not implemented")
+	case IDToken:
+		if audience == "" {
+			return "", errors.New("audience is required for ID tokens")
+		}
+	default:
+		return "", fmt.Errorf(`unknown token type %q: must be "%s" or "%s"`, typ, AccessToken, IDToken)
+	}
+
+	yk, err := open(serial)
+	if err != nil {
+		return "", err
+	}
+	defer yk.Close()
+
+	sign, err := signer(yk)
+	if err != nil {
+		return "", err
+	}
+
+	return assertion(sign, account, audience, nil, lifetime)
+}
 
 // signer reads the slot's certificate and policies and returns a signer for its key.
 func signer(yk *piv.YubiKey) (crypto.Signer, error) {
