@@ -39,7 +39,6 @@ func main() {
 	case "generate-key":
 		fs.String("subject", "yk-<serial>", "subject CN")
 		fs.Int("valid-days", 365, "valid days")
-		fs.String("algorithm", "rsa2048", "rsa2048|rsa4096")
 		fs.Func("pin-policy", "never|once|always|match-once|match-always (default: once)", parsePinPolicy)
 		fs.Func("touch-policy", "never|always|cached (default: never)", parseTouchPolicy)
 	case "token":
