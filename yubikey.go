@@ -6,6 +6,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/hex"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"math/big"
@@ -16,6 +17,60 @@ import (
 	"github.com/go-piv/piv-go/v2/piv"
 	"golang.org/x/term"
 )
+
+func generateKey(serial uint, subject string, validDays int) error {
+	yk, err := open(serial)
+	if err != nil {
+		return err
+	}
+	defer yk.Close()
+
+	mgmt, err := promptManagementKey()
+	if err != nil {
+		return err
+	}
+
+	if subject == "" {
+		s, err := yk.Serial()
+		if err != nil {
+			return err
+		}
+		subject = fmt.Sprintf("yk-%d", s)
+	}
+
+	pub, err := yk.GenerateKey(mgmt, slot, piv.Key{
+		Algorithm:   piv.AlgorithmRSA2048,
+		PINPolicy:   pinPolicy,
+		TouchPolicy: touchPolicy,
+	})
+	if err != nil {
+		return err
+	}
+
+	priv, err := yk.PrivateKey(slot, pub, piv.KeyAuth{
+		PINPolicy: pinPolicy,
+		PINPrompt: promptPIN,
+	})
+	if err != nil {
+		return err
+	}
+	sign, ok := priv.(crypto.Signer)
+	if !ok {
+		return errors.New("key does not implement crypto.Signer")
+	}
+
+	cert, err := generateCert(subject, validDays, pub, sign)
+	if err != nil {
+		return err
+	}
+	if touchPolicy != piv.TouchPolicyNever {
+		fmt.Fprintln(os.Stderr, "Touch your YubiKey...")
+	}
+	if err := yk.SetCertificate(mgmt, slot, cert); err != nil {
+		return err
+	}
+	return pem.Encode(os.Stdout, &pem.Block{Type: "CERTIFICATE", Bytes: cert.Raw})
+}
 
 // open returns the YubiKey with the given serial,
 // or the first one when serial is 0.
