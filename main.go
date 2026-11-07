@@ -49,7 +49,7 @@ func main() {
 		fs.Func("scopes", "https://www.googleapis.com/auth/cloud-platform[,...]", parseScopes)
 	case "serve":
 		fs.String("account", "", "Service Account email")
-		fs.Int64("numeric-project-id", 0, "numeric project id")
+		fs.Uint64("numeric-project-id", 0, "numeric project id")
 		fs.Int("cache-lifetime", 10, "cache lifetime")
 		fs.String("addr", "127.0.0.1:1692", "listen address")
 	case "-h", "--help":
