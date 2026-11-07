@@ -37,7 +37,7 @@ func main() {
 
 	switch cmd {
 	case "generate-key":
-		fs.String("subject", "yk-<serial>", "subject CN")
+		fs.String("subject", "", "subject CN (default: yk-<serial>)")
 		fs.Int("valid-days", 365, "valid days")
 		fs.Func("pin-policy", "never|once|always|match-once|match-always (default: once)", parsePinPolicy)
 		fs.Func("touch-policy", "never|always|cached (default: never)", parseTouchPolicy)
