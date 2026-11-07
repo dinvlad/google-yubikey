@@ -18,6 +18,8 @@ import (
 	"golang.org/x/term"
 )
 
+// generateKey creates a new key and self-signed certificate on the YubiKey
+// replacing any existing key, and prints the certificate as PEM.
 func generateKey(serial uint, subject string, validDays int) error {
 	yk, err := open(serial)
 	if err != nil {
@@ -125,6 +127,7 @@ func promptPIN() (string, error) {
 	return strings.TrimSpace(string(b)), nil
 }
 
+// privateKey returns a signer for the private key, prompting for the PIN when needed.
 func privateKey(yk *piv.YubiKey, pub crypto.PublicKey, pp piv.PINPolicy) (crypto.Signer, error) {
 	priv, err := yk.PrivateKey(slot, pub, piv.KeyAuth{
 		PINPolicy: pp,
