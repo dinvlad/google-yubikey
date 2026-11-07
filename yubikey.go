@@ -47,16 +47,9 @@ func generateKey(serial uint, subject string, validDays int) error {
 		return err
 	}
 
-	priv, err := yk.PrivateKey(slot, pub, piv.KeyAuth{
-		PINPolicy: pinPolicy,
-		PINPrompt: promptPIN,
-	})
+	sign, err := privateKey(yk, pub, pinPolicy)
 	if err != nil {
 		return err
-	}
-	sign, ok := priv.(crypto.Signer)
-	if !ok {
-		return errors.New("key does not implement crypto.Signer")
 	}
 
 	cert, err := generateCert(subject, validDays, pub, sign)
@@ -130,6 +123,21 @@ func promptPIN() (string, error) {
 		fmt.Fprintln(os.Stderr, "Touch your YubiKey...")
 	}
 	return strings.TrimSpace(string(b)), nil
+}
+
+func privateKey(yk *piv.YubiKey, pub crypto.PublicKey, pp piv.PINPolicy) (crypto.Signer, error) {
+	priv, err := yk.PrivateKey(slot, pub, piv.KeyAuth{
+		PINPolicy: pp,
+		PINPrompt: promptPIN,
+	})
+	if err != nil {
+		return nil, err
+	}
+	sign, ok := priv.(crypto.Signer)
+	if !ok {
+		return nil, errors.New("key does not implement crypto.Signer")
+	}
+	return sign, nil
 }
 
 // generateCert builds and signs a self-signed certificate.
