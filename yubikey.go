@@ -113,8 +113,10 @@ func promptManagementKey() ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("management key must be hex: %w", err)
 	}
-	if len(key) != 24 {
-		return nil, fmt.Errorf("management key must be 24 bytes, got %d", len(key))
+	switch len(key) {
+	case 16, 24, 32:
+	default:
+		return nil, fmt.Errorf("management key must be 16, 24 or 32 bytes, got %d", len(key))
 	}
 	return key, nil
 }
