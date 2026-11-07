@@ -27,6 +27,7 @@ func main() {
 
 	cmd, args := os.Args[1], os.Args[2:]
 	fs := flag.NewFlagSet(cmd, flag.ExitOnError)
+	fs.Uint("serial", 0, "YubiKey serial (0 for first available)")
 
 	switch cmd {
 	case "generate-key":
