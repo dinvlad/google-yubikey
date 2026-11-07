@@ -13,19 +13,17 @@ import (
 
 const (
 	usage = "usage: google-yubikey <generate-key|token|serve> [flags]"
-
-	defaultScope = "https://www.googleapis.com/auth/cloud-platform"
 )
 
 var (
 	slot        = piv.SlotAuthentication
 	pinPolicy   = piv.PINPolicyOnce
 	touchPolicy = piv.TouchPolicyNever
-	scopes      = []string{defaultScope}
 
 	serial    *uint
 	subject   *string
 	validDays *int
+	scopes    []string
 )
 
 func main() {
@@ -50,7 +48,8 @@ func main() {
 		fs.String("account", "", "Service Account email")
 		fs.String("type", "access", "access|id")
 		fs.String("audience", "", "ID token audience")
-		fs.Func("scopes", "https://www.googleapis.com/auth/cloud-platform[,...]", parseScopes)
+		fs.Func("scopes", "comma-separated Google OAuth 2.0 scopes for access token "+
+			`(default: "https://www.googleapis.com/auth/cloud-platform")`, parseScopes)
 	case "serve":
 		fs.String("account", "", "Service Account email")
 		fs.Uint64("numeric-project-id", 0, "numeric project id")
@@ -132,9 +131,6 @@ func parseScopes(s string) error {
 		if v = strings.TrimSpace(v); v != "" {
 			scopes = append(scopes, v)
 		}
-	}
-	if len(scopes) == 0 {
-		scopes = []string{defaultScope}
 	}
 	return nil
 }
