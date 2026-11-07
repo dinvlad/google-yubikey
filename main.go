@@ -23,6 +23,7 @@ var (
 	serial    *uint
 	subject   *string
 	validDays *int
+	account   string
 	scopes    []string
 )
 
@@ -45,13 +46,13 @@ func main() {
 		fs.Func("pin-policy", `never|once|always|match-once|match-always (default "once")`, parsePinPolicy)
 		fs.Func("touch-policy", `never|always|cached (default "never")`, parseTouchPolicy)
 	case "token":
-		fs.String("account", "", "Service Account email")
+		fs.Func("account", "Service Account email", parseAccount)
 		fs.String("type", "access", "access|id")
 		fs.String("audience", "", "ID token audience")
 		fs.Func("scopes", "comma-separated Google OAuth 2.0 scopes for access token "+
 			`(default: "https://www.googleapis.com/auth/cloud-platform")`, parseScopes)
 	case "serve":
-		fs.String("account", "", "Service Account email")
+		fs.Func("account", "Service Account email", parseAccount)
 		fs.Uint64("numeric-project-id", 0, "numeric project id")
 		fs.Int("cache-lifetime", 10, "cache lifetime")
 		fs.String("addr", "127.0.0.1:1692", "listen address")
@@ -122,6 +123,14 @@ func parseTouchPolicy(s string) error {
 	default:
 		return errors.New(`must be one of "never", "always" or "cached"`)
 	}
+	return nil
+}
+
+func parseAccount(s string) error {
+	if s == "" {
+		return errors.New("Service Account email is required")
+	}
+	account = s
 	return nil
 }
 
