@@ -8,6 +8,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -106,4 +108,41 @@ func assertion(sign crypto.Signer, iss, aud string, scopes []string, lifetime in
 	}
 
 	return msg + "." + b64.EncodeToString(sig), nil
+}
+
+type tokenResponse struct {
+	AccessToken      string `json:"access_token"`
+	Error            string `json:"error"`
+	ErrorDescription string `json:"error_description"`
+}
+
+// accessToken exchanges a signed JWT assertion for an OAuth2 access token.
+func accessToken(assertion string) (string, error) {
+	resp, err := http.PostForm("https://oauth2.googleapis.com/token", url.Values{
+		"grant_type": {"urn:ietf:params:oauth:grant-type:jwt-bearer"},
+		"assertion":  {assertion},
+	})
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	var res tokenResponse
+	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
+		if resp.StatusCode != http.StatusOK {
+			return "", fmt.Errorf("token exchange: %s", resp.Status)
+		}
+		return "", err
+	}
+	if resp.StatusCode != http.StatusOK || res.Error != "" {
+		msg := res.ErrorDescription
+		if msg == "" {
+			msg = res.Error
+		}
+		if msg == "" {
+			msg = resp.Status
+		}
+		return "", fmt.Errorf("token exchange: %s", msg)
+	}
+	return res.AccessToken, nil
 }
