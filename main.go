@@ -37,15 +37,15 @@ func main() {
 	cmd, args := os.Args[1], os.Args[2:]
 	fs := flag.NewFlagSet(cmd, flag.ExitOnError)
 
-	fs.Func("slot", "authentication|signature|key-management|card-authentication (default: authentication)", parseSlot)
+	fs.Func("slot", `authentication|signature|key-management|card-authentication (default "authentication")`, parseSlot)
 	serial = fs.Uint("serial", 0, "YubiKey serial (0 for first available)")
 
 	switch cmd {
 	case "generate-key":
-		subject = fs.String("subject", "", "subject CN (default: yk-<serial>)")
+		subject = fs.String("subject", "", `subject Common Name (default "yk-<serial>")`)
 		validDays = fs.Int("valid-days", 365, "valid days")
-		fs.Func("pin-policy", "never|once|always|match-once|match-always (default: once)", parsePinPolicy)
-		fs.Func("touch-policy", "never|always|cached (default: never)", parseTouchPolicy)
+		fs.Func("pin-policy", `never|once|always|match-once|match-always (default "once")`, parsePinPolicy)
+		fs.Func("touch-policy", `never|always|cached (default "never")`, parseTouchPolicy)
 	case "token":
 		fs.String("account", "", "Service Account email")
 		fs.String("type", "access", "access|id")
