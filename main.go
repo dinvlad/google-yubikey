@@ -24,6 +24,8 @@ var (
 	subject   *string
 	validDays *int
 	account   string
+	tokType   *string
+	audience  *string
 	scopes    []string
 )
 
@@ -47,8 +49,8 @@ func main() {
 		fs.Func("touch-policy", `never|always|cached (default "never")`, parseTouchPolicy)
 	case "token":
 		fs.Func("account", "Service Account email", parseAccount)
-		fs.String("type", "access", "access|id")
-		fs.String("audience", "", "ID token audience")
+		tokType = fs.String("type", "access", "access|id")
+		audience = fs.String("audience", "", "ID token audience")
 		fs.Func("scopes", "comma-separated Google OAuth 2.0 scopes for access token "+
 			`(default: "https://www.googleapis.com/auth/cloud-platform")`, parseScopes)
 	case "serve":
@@ -66,14 +68,20 @@ func main() {
 
 	fs.Parse(args)
 
+	var err error
 	switch cmd {
 	case "generate-key":
-		if err := generateKey(*serial, *subject, *validDays); err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			os.Exit(1)
+		err = generateKey(*serial, *subject, *validDays)
+	case "token":
+		var tok string
+		if tok, err = generateToken(*serial, account, tokenType(*tokType), *audience, scopes, 3600); err == nil {
+			fmt.Println(tok)
 		}
-	case "token", "serve":
-		fmt.Fprintf(os.Stderr, "%s: not implemented\n", cmd)
+	case "serve":
+		err = fmt.Errorf("%s: not implemented", cmd)
+	}
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
