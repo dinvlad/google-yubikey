@@ -23,7 +23,7 @@ var (
 	serial    *uint
 	subject   *string
 	validDays *int
-	account   string
+	account   *string
 	tokType   *string
 	audience  *string
 	scopes    []string
@@ -48,13 +48,13 @@ func main() {
 		fs.Func("pin-policy", `never|once|always|match-once|match-always (default "once")`, parsePinPolicy)
 		fs.Func("touch-policy", `never|always|cached (default "never")`, parseTouchPolicy)
 	case "token":
-		fs.Func("account", "Service Account email", parseAccount)
+		account = fs.String("account", "", "Service Account email (required)")
 		tokType = fs.String("type", "access", "access|id")
 		audience = fs.String("audience", "", "ID token audience")
 		fs.Func("scopes", "comma-separated Google OAuth 2.0 scopes for access token "+
 			`(default: "https://www.googleapis.com/auth/cloud-platform")`, parseScopes)
 	case "serve":
-		fs.Func("account", "Service Account email", parseAccount)
+		account = fs.String("account", "", "Service Account email (required)")
 		fs.Uint64("numeric-project-id", 0, "numeric project id")
 		fs.Int("cache-lifetime", 10, "cache lifetime")
 		fs.String("addr", "127.0.0.1:1692", "listen address")
@@ -68,13 +68,19 @@ func main() {
 
 	fs.Parse(args)
 
+	t := tokenType(*tokType)
+	if err := validateAccount(t); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+
 	var err error
 	switch cmd {
 	case "generate-key":
 		err = generateKey(*serial, *subject, *validDays)
 	case "token":
 		var tok string
-		if tok, err = generateToken(*serial, account, tokenType(*tokType), *audience, scopes, 3600); err == nil {
+		if tok, err = generateToken(*serial, *account, t, *audience, scopes, 3600); err == nil {
 			fmt.Println(tok)
 		}
 	case "serve":
@@ -134,20 +140,22 @@ func parseTouchPolicy(s string) error {
 	return nil
 }
 
-func parseAccount(s string) error {
-	if s == "" {
-		return errors.New("Service Account email is required")
-	}
-	account = s
-	return nil
-}
-
 func parseScopes(s string) error {
 	scopes = nil
 	for v := range strings.SplitSeq(s, ",") {
 		if v = strings.TrimSpace(v); v != "" {
 			scopes = append(scopes, v)
 		}
+	}
+	return nil
+}
+
+func validateAccount(typ tokenType) error {
+	if typ != IDToken && typ != AccessToken {
+		return nil
+	}
+	if *account == "" {
+		return errors.New("Error: Service Account email is required")
 	}
 	return nil
 }
