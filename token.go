@@ -23,18 +23,21 @@ const (
 	AccessToken tokenType = "access"
 )
 
-// token generates an access or ID token for the service account.
-func token(serial uint, account, typ, audience string, lifetime int) (string, error) {
-	if account == "" {
-		return "", errors.New("Service Account email is required")
-	}
-
-	switch tokenType(typ) {
+// generateToken creates an access or ID token for the service account.
+func generateToken(serial uint, account string, typ tokenType, audience string, scopes []string, lifetime int) (string, error) {
+	switch typ {
 	case AccessToken:
-		return "", errors.New("access tokens are not implemented")
+		if audience != "" {
+			return "", errors.New("custom audience is not supported for access tokens")
+		} else if len(scopes) == 0 {
+			scopes = []string{"https://www.googleapis.com/auth/cloud-platform"}
+		}
+		audience = "https://oauth2.googleapis.com/token"
 	case IDToken:
 		if audience == "" {
 			return "", errors.New("audience is required for ID tokens")
+		} else if len(scopes) > 0 {
+			return "", errors.New("scopes are not supported for ID tokens")
 		}
 	default:
 		return "", fmt.Errorf(`unknown token type %q: must be "%s" or "%s"`, typ, AccessToken, IDToken)
@@ -51,7 +54,14 @@ func token(serial uint, account, typ, audience string, lifetime int) (string, er
 		return "", err
 	}
 
-	return signJWT(sign, account, audience, nil, lifetime)
+	jwt, err := signJWT(sign, account, audience, scopes, lifetime)
+	if err != nil {
+		return "", err
+	}
+	if typ == IDToken {
+		return jwt, nil
+	}
+	return accessToken(jwt)
 }
 
 // signer reads the slot's certificate and policies and returns a signer for its key.
