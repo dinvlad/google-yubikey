@@ -66,28 +66,26 @@ func main() {
 		fs.Usage()
 		os.Exit(2)
 	}
-
 	serial = fs.Uint("serial", 0, "YubiKey serial (0 for first available)")
 	fs.Func("slot", `authentication|signature|key-management|card-authentication (default "authentication")`, parseSlot)
-
 	fs.Parse(args)
-
-	t := tokenType(*tokType)
-	if err := validateAccount(fs, t); err != nil {
-		fmt.Fprintln(fs.Output(), err)
-		os.Exit(2)
-	}
 
 	var err error
 	switch cmd {
 	case "generate-key":
 		err = generateKey(*serial, *subject, *validDays)
 	case "token":
+		if err = requireAccount(fs); err != nil {
+			break
+		}
 		var tok string
-		if tok, err = generateToken(*serial, *account, t, *audience, scopes, 3600); err == nil {
+		if tok, err = generateToken(*serial, *account, tokenType(*tokType), *audience, scopes, 3600); err == nil {
 			fmt.Println(tok)
 		}
 	case "serve":
+		if err = requireAccount(fs); err != nil {
+			break
+		}
 		err = fmt.Errorf("%s: not implemented", cmd)
 	}
 	if err != nil {
@@ -154,10 +152,7 @@ func parseScopes(s string) error {
 	return nil
 }
 
-func validateAccount(fs *flag.FlagSet, typ tokenType) error {
-	if typ != IDToken && typ != AccessToken {
-		return nil
-	}
+func requireAccount(fs *flag.FlagSet) error {
 	if *account == "" {
 		fs.Usage()
 		return errors.New("Error: Service Account email is required")
