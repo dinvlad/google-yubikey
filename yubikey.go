@@ -63,9 +63,6 @@ func generateKey(serial uint, subject string, validDays int) error {
 	if err != nil {
 		return err
 	}
-	if touchPolicy != piv.TouchPolicyNever {
-		fmt.Fprintln(os.Stderr, "Touch your YubiKey...")
-	}
 	if err := yk.SetCertificate(mgmt, slot, cert); err != nil {
 		return err
 	}
@@ -128,6 +125,9 @@ func promptPIN() (string, error) {
 	fmt.Fprintln(os.Stderr)
 	if err != nil {
 		return "", err
+	}
+	if touchPolicy != piv.TouchPolicyNever {
+		fmt.Fprintln(os.Stderr, "Touch your YubiKey...")
 	}
 	return strings.TrimSpace(string(b)), nil
 }
