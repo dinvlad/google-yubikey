@@ -43,7 +43,7 @@ func main() {
 		fs.Func("touch-policy", "never|always|cached (default: never)", parseTouchPolicy)
 	case "token":
 		fs.String("account", "", "Service Account email")
-		fs.String("token-type", "access", "access|id")
+		fs.String("type", "access", "access|id")
 		fs.String("audience", "", "ID token audience")
 		fs.Func("scopes", "https://www.googleapis.com/auth/cloud-platform[,...]", parseScopes)
 	case "serve":
