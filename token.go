@@ -51,7 +51,7 @@ func token(serial uint, account, typ, audience string, lifetime int) (string, er
 		return "", err
 	}
 
-	return assertion(sign, account, audience, nil, lifetime)
+	return signJWT(sign, account, audience, nil, lifetime)
 }
 
 // signer reads the slot's certificate and policies and returns a signer for its key.
@@ -83,8 +83,8 @@ type jwtClaims struct {
 	Scope string `json:"scope,omitempty"`
 }
 
-// assertion returns a signed RS256 JWT for the given audience and scopes.
-func assertion(sign crypto.Signer, iss, aud string, scopes []string, lifetime int) (string, error) {
+// signJWT returns a signed RS256 JWT for the given issuer, audience and scopes.
+func signJWT(sign crypto.Signer, iss, aud string, scopes []string, lifetime int) (string, error) {
 	now := time.Now().Unix()
 
 	header, err := json.Marshal(jwtHeader{"JWT", "RS256"})
