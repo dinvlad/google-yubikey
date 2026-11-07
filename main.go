@@ -15,8 +15,8 @@ const usage = "usage: google-yubikey <generate-key|token|serve> [flags]"
 
 var (
 	slot        = piv.SlotAuthentication
-	pinPolicy   piv.PINPolicy
-	touchPolicy piv.TouchPolicy
+	pinPolicy   = piv.PINPolicyOnce
+	touchPolicy = piv.TouchPolicyNever
 	scopes      []string
 )
 
@@ -36,8 +36,8 @@ func main() {
 		fs.String("subject", "yk-<serial>", "subject CN")
 		fs.Int("valid-days", 365, "valid days")
 		fs.String("algorithm", "rsa2048", "rsa2048|rsa4096")
-		fs.Func("pin-policy", "never|once|always|match-once|match-always", parsePinPolicy)
-		fs.Func("touch-policy", "never|always|cached", parseTouchPolicy)
+		fs.Func("pin-policy", "never|once|always|match-once|match-always (default: once)", parsePinPolicy)
+		fs.Func("touch-policy", "never|always|cached (default: never)", parseTouchPolicy)
 	case "token":
 		fs.String("account", "", "Service Account email")
 		fs.String("token-type", "access", "access|id")
