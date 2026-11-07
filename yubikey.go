@@ -57,3 +57,14 @@ func promptManagementKey() ([]byte, error) {
 	}
 	return key, nil
 }
+
+// promptPIN reads the PIV PIN without echo.
+func promptPIN() (string, error) {
+	fmt.Fprint(os.Stderr, "Enter PIN: ")
+	b, err := term.ReadPassword(int(os.Stdin.Fd()))
+	fmt.Fprintln(os.Stderr)
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(b)), nil
+}
