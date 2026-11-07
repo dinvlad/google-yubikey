@@ -14,6 +14,7 @@ import (
 const usage = "usage: google-yubikey <generate-key|token|serve> [flags]"
 
 var (
+	slot        = piv.SlotAuthentication
 	pinPolicy   piv.PINPolicy
 	touchPolicy piv.TouchPolicy
 	scopes      []string
@@ -28,6 +29,7 @@ func main() {
 	cmd, args := os.Args[1], os.Args[2:]
 	fs := flag.NewFlagSet(cmd, flag.ExitOnError)
 	fs.Uint("serial", 0, "YubiKey serial (0 for first available)")
+	fs.Func("slot", "authentication|signature|key-management|card-authentication (default: authentication)", parseSlot)
 
 	switch cmd {
 	case "generate-key":
@@ -57,6 +59,22 @@ func main() {
 	fs.Parse(args)
 	fmt.Fprintf(os.Stderr, "%s: not implemented\n", cmd)
 	os.Exit(1)
+}
+
+func parseSlot(s string) error {
+	switch s {
+	case "authentication":
+		slot = piv.SlotAuthentication
+	case "signature":
+		slot = piv.SlotSignature
+	case "key-management":
+		slot = piv.SlotKeyManagement
+	case "card-authentication":
+		slot = piv.SlotCardAuthentication
+	default:
+		return errors.New(`must be one of "authentication", "signature", "key-management" or "card-authentication"`)
+	}
+	return nil
 }
 
 func parsePinPolicy(s string) error {
