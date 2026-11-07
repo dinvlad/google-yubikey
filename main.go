@@ -22,6 +22,10 @@ var (
 	pinPolicy   = piv.PINPolicyOnce
 	touchPolicy = piv.TouchPolicyNever
 	scopes      = []string{defaultScope}
+
+	serial    *uint
+	subject   *string
+	validDays *int
 )
 
 func main() {
@@ -32,13 +36,14 @@ func main() {
 
 	cmd, args := os.Args[1], os.Args[2:]
 	fs := flag.NewFlagSet(cmd, flag.ExitOnError)
-	fs.Uint("serial", 0, "YubiKey serial (0 for first available)")
+
 	fs.Func("slot", "authentication|signature|key-management|card-authentication (default: authentication)", parseSlot)
+	serial = fs.Uint("serial", 0, "YubiKey serial (0 for first available)")
 
 	switch cmd {
 	case "generate-key":
-		fs.String("subject", "", "subject CN (default: yk-<serial>)")
-		fs.Int("valid-days", 365, "valid days")
+		subject = fs.String("subject", "", "subject CN (default: yk-<serial>)")
+		validDays = fs.Int("valid-days", 365, "valid days")
 		fs.Func("pin-policy", "never|once|always|match-once|match-always (default: once)", parsePinPolicy)
 		fs.Func("touch-policy", "never|always|cached (default: never)", parseTouchPolicy)
 	case "token":
@@ -60,8 +65,17 @@ func main() {
 	}
 
 	fs.Parse(args)
-	fmt.Fprintf(os.Stderr, "%s: not implemented\n", cmd)
-	os.Exit(1)
+
+	switch cmd {
+	case "generate-key":
+		if err := generateKey(*serial, *subject, *validDays); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+	case "token", "serve":
+		fmt.Fprintf(os.Stderr, "%s: not implemented\n", cmd)
+		os.Exit(1)
+	}
 }
 
 func parseSlot(s string) error {
