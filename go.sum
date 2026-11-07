@@ -1,0 +1,4 @@
+github.com/go-piv/piv-go/v2 v2.6.0 h1:/Z+uqlv5luC8aqLh/uO05egk23UH4KT/ldvPHXpnKls=
+github.com/go-piv/piv-go/v2 v2.6.0/go.mod h1:gcsS2WGbToZk5PwtsCIlCWzV/R+r/wN+Xi+6O6IlU3c=
+golang.org/x/crypto v0.50.0 h1:zO47/JPrL6vsNkINmLoo/PH1gcxpls50DNogFvB5ZGI=
+golang.org/x/crypto v0.50.0/go.mod h1:3muZ7vA7PBCE6xgPX7nkzzjiUq87kRItoJQM1Yo8S+Q=
