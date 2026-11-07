@@ -11,10 +11,6 @@ import (
 	"github.com/go-piv/piv-go/v2/piv"
 )
 
-const (
-	usage = "usage: google-yubikey <generate-key|token|serve> [flags]"
-)
-
 var (
 	slot        = piv.SlotAuthentication
 	pinPolicy   = piv.PINPolicyOnce
@@ -29,17 +25,22 @@ var (
 	scopes    []string
 )
 
+func usage() {
+	fmt.Fprintln(os.Stderr, "usage: google-yubikey <generate-key|token|serve> [flags]")
+}
+
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Fprintln(os.Stderr, usage)
+		usage()
 		os.Exit(2)
 	}
 
 	cmd, args := os.Args[1], os.Args[2:]
 	fs := flag.NewFlagSet(cmd, flag.ExitOnError)
-
-	fs.Func("slot", `authentication|signature|key-management|card-authentication (default "authentication")`, parseSlot)
-	serial = fs.Uint("serial", 0, "YubiKey serial (0 for first available)")
+	fs.Usage = func() {
+		usage()
+		fs.PrintDefaults()
+	}
 
 	switch cmd {
 	case "generate-key":
@@ -58,20 +59,23 @@ func main() {
 		fs.Uint64("numeric-project-id", 0, "numeric project id")
 		fs.Int("cache-lifetime", 10, "cache lifetime")
 		fs.String("addr", "127.0.0.1:1692", "listen address")
-	case "-h", "--help":
-		fmt.Println(usage)
+	case "-h", "-help", "--help":
+		fs.Usage()
 		return
 	default:
-		fmt.Fprintln(os.Stderr, usage)
+		fs.Usage()
 		os.Exit(2)
 	}
+
+	serial = fs.Uint("serial", 0, "YubiKey serial (0 for first available)")
+	fs.Func("slot", `authentication|signature|key-management|card-authentication (default "authentication")`, parseSlot)
 
 	fs.Parse(args)
 
 	t := tokenType(*tokType)
-	if err := validateAccount(t); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+	if err := validateAccount(fs, t); err != nil {
+		fmt.Fprintln(fs.Output(), err)
+		os.Exit(2)
 	}
 
 	var err error
@@ -150,11 +154,12 @@ func parseScopes(s string) error {
 	return nil
 }
 
-func validateAccount(typ tokenType) error {
+func validateAccount(fs *flag.FlagSet, typ tokenType) error {
 	if typ != IDToken && typ != AccessToken {
 		return nil
 	}
 	if *account == "" {
+		fs.Usage()
 		return errors.New("Error: Service Account email is required")
 	}
 	return nil
