@@ -56,15 +56,15 @@ func main() {
 		fs.Func("pin-policy", `never|once|always|match-once|match-always (default "once")`, parsePinPolicy)
 		fs.Func("touch-policy", `never|always|cached (default "never")`, parseTouchPolicy)
 	case "token":
-		account = fs.String("account", "", "Service Account email (required)")
+		parseAccount(fs)
 		tokType = fs.String("type", "access", "access|id")
 		audience = fs.String("audience", "", "ID token audience")
-		fs.Func("scopes", "comma-separated Google OAuth 2.0 scopes for access token "+
-			`(default: "https://www.googleapis.com/auth/cloud-platform")`, parseScopes)
+		parseScopes(fs)
 	case "serve":
-		account = fs.String("account", "", "Service Account email (required)")
+		parseAccount(fs)
 		projectNum = fs.Uint64("project-number", 0, "Google project number")
 		addr = fs.String("addr", "127.0.0.1:1692", "listen address")
+		parseScopes(fs)
 	case "-h", "-help", "--help":
 		fs.Usage()
 		return
@@ -92,7 +92,7 @@ func main() {
 		if err = requireAccount(fs); err != nil {
 			break
 		}
-		err = metadata.Serve(*serial, slot, *account, *projectNum, *addr)
+		err = metadata.Serve(*serial, slot, *account, *projectNum, scopes, *addr)
 	}
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -148,14 +148,21 @@ func parseTouchPolicy(s string) error {
 	return nil
 }
 
-func parseScopes(s string) error {
-	scopes = nil
-	for v := range strings.SplitSeq(s, ",") {
-		if v = strings.TrimSpace(v); v != "" {
-			scopes = append(scopes, v)
+func parseAccount(fs *flag.FlagSet) {
+	account = fs.String("account", "", "Service Account email (required)")
+}
+
+func parseScopes(fs *flag.FlagSet) {
+	fs.Func("scopes", "comma-separated Google OAuth 2.0 scopes for access tokens "+
+		`(default: "https://www.googleapis.com/auth/cloud-platform")`, func(s string) error {
+		scopes = nil
+		for v := range strings.SplitSeq(s, ",") {
+			if v = strings.TrimSpace(v); v != "" {
+				scopes = append(scopes, v)
+			}
 		}
-	}
-	return nil
+		return nil
+	})
 }
 
 func requireAccount(fs *flag.FlagSet) error {

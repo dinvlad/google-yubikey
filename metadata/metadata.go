@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/dinvlad/google-yubikey/v2/token"
 	"github.com/go-piv/piv-go/v2/piv"
 )
 
@@ -22,12 +23,18 @@ const (
 type server struct {
 	email      string
 	projectNum string
+	scopes     []string
 }
 
-func Serve(serial uint, slot piv.Slot, account string, projectNum uint64, addr string) error {
+func Serve(serial uint, slot piv.Slot, account string, projectNum uint64, scopes []string, addr string) error {
+	if len(scopes) == 0 {
+		scopes = []string{token.DefaultScope}
+	}
+
 	s := server{
 		email:      account,
 		projectNum: strconv.FormatUint(projectNum, 10),
+		scopes:     scopes,
 	}
 
 	mux := http.NewServeMux()

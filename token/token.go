@@ -22,6 +22,8 @@ type Type string
 const (
 	IDToken     Type = "id"
 	AccessToken Type = "access"
+
+	DefaultScope = "https://www.googleapis.com/auth/cloud-platform"
 )
 
 // generateToken creates an access or ID token for the service account.
@@ -31,7 +33,7 @@ func Generate(serial uint, slot piv.Slot, account string, typ Type, audience str
 		if audience != "" {
 			return "", errors.New("custom audience is not supported for access tokens")
 		} else if len(scopes) == 0 {
-			scopes = []string{"https://www.googleapis.com/auth/cloud-platform"}
+			scopes = []string{DefaultScope}
 		}
 		audience = "https://oauth2.googleapis.com/token"
 	case IDToken:
