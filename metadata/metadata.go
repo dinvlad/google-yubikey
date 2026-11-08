@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/dinvlad/google-yubikey/v2/token"
 	"github.com/go-piv/piv-go/v2/piv"
@@ -24,17 +25,19 @@ const (
 
 type server struct {
 	email      string
+	projectID  string
 	projectNum string
 	scopes     []string
 }
 
-func Serve(serial uint, slot piv.Slot, account string, projectNum uint64, scopes []string, addr string) error {
+func Serve(serial uint, slot piv.Slot, email string, projectNum uint64, scopes []string, addr string) error {
 	if len(scopes) == 0 {
 		scopes = []string{token.DefaultScope}
 	}
 
 	s := server{
-		email:      account,
+		email:      email,
+		projectID:  strings.Split(strings.Split(email, "@")[1], ".")[0],
 		projectNum: strconv.FormatUint(projectNum, 10),
 		scopes:     scopes,
 	}
@@ -50,7 +53,7 @@ func Serve(serial uint, slot piv.Slot, account string, projectNum uint64, scopes
 	mux.Handle(metaRootSaDefault+"/", http.StripPrefix(metaRootSaDefault, saMux))
 
 	pMux := http.NewServeMux()
-	pMux.HandleFunc("GET /project-id", projectIDHandler)
+	pMux.HandleFunc("GET /project-id", s.projectIDHandler)
 	pMux.HandleFunc("GET /numeric-project-id", s.projectNumHandler)
 	mux.Handle(metaRootProject+"/", http.StripPrefix(metaRootProject, pMux))
 
@@ -95,8 +98,8 @@ func saIdentityHandler(w http.ResponseWriter, r *http.Request) {
 	handleNotImplemented(w)
 }
 
-func projectIDHandler(w http.ResponseWriter, r *http.Request) {
-	handleNotImplemented(w)
+func (s server) projectIDHandler(w http.ResponseWriter, r *http.Request) {
+	io.WriteString(w, s.projectID)
 }
 
 func (s server) projectNumHandler(w http.ResponseWriter, r *http.Request) {
