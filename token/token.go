@@ -36,6 +36,7 @@ type Minter struct {
 	yk     *piv.YubiKey
 	signer crypto.Signer
 	params chan tokenParams
+	done   chan struct{}
 }
 
 type tokenParams struct {
@@ -43,6 +44,7 @@ type tokenParams struct {
 	audience string
 	scopes   []string
 	result   chan tokenResult
+	quit     bool
 }
 
 type tokenResult struct {
@@ -56,20 +58,28 @@ func NewMinter(serial uint, slot piv.Slot, email *mail.Address) (m *Minter, err 
 		slot:   slot,
 		email:  email,
 		params: make(chan tokenParams),
+		done:   make(chan struct{}),
 	}
 	go m.worker()
 	return
 }
 
 func (m *Minter) Close() {
-	if m.yk != nil {
-		m.yk.Close()
+	select {
+	case m.params <- tokenParams{quit: true}:
+	case <-m.done:
 	}
-	close(m.params)
 }
 
 func (m *Minter) worker() {
+	defer close(m.done)
 	for p := range m.params {
+		if p.quit {
+			if m.yk != nil {
+				m.yk.Close()
+			}
+			return
+		}
 		token, err := m.mint(p.typ, p.audience, p.scopes)
 		p.result <- tokenResult{token, err}
 		close(p.result)
@@ -78,7 +88,11 @@ func (m *Minter) worker() {
 
 func (m *Minter) Generate(typ Type, audience string, scopes []string) (string, error) {
 	results := make(chan tokenResult)
-	m.params <- tokenParams{typ, audience, scopes, results}
+	select {
+	case m.params <- tokenParams{typ, audience, scopes, results, false}:
+	case <-m.done:
+		return "", errors.New("token minter is already closed")
+	}
 	r := <-results
 	return r.token, r.err
 }
