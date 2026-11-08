@@ -16,11 +16,10 @@ import (
 )
 
 const (
-	metaRoot          = "/computeMetadata/v1"
-	metaRootSa        = metaRoot + "/instance/service-accounts"
-	metaRootSaDefault = metaRootSa + "/" + metaDefaultAlias
-	metaRootProject   = metaRoot + "/project"
-	metaDefaultAlias  = "default"
+	metaRoot         = "/computeMetadata/v1"
+	metaRootSa       = metaRoot + "/instance/service-accounts"
+	metaRootProject  = metaRoot + "/project"
+	metaDefaultAlias = "default"
 
 	metaFlavorHeader = "Metadata-Flavor"
 	metaFlavorValue  = "Google"
@@ -41,7 +40,9 @@ func Serve(serial uint, slot piv.Slot, email *mail.Address, projectNum uint64, s
 	saMux.HandleFunc("GET /identity", s.saIdentityHandler)
 	saMux.HandleFunc("GET /token", s.saTokenHandler)
 	mux.HandleFunc(metaRootSa+"/", s.saHandler)
-	mux.Handle(metaRootSaDefault+"/", http.StripPrefix(metaRootSaDefault, saMux))
+	for _, alias := range []string{metaDefaultAlias, email.Address} {
+		mux.Handle(metaRootSa+"/"+alias+"/", http.StripPrefix(metaRootSa+"/"+alias, saMux))
+	}
 
 	pMux := http.NewServeMux()
 	pMux.HandleFunc("GET /project-id", s.projectIDHandler)
