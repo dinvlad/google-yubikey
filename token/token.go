@@ -24,7 +24,9 @@ const (
 	IDToken     Type = "id"
 	AccessToken Type = "access"
 
-	DefaultScope = "https://www.googleapis.com/auth/cloud-platform"
+	DefaultScope       = "https://www.googleapis.com/auth/cloud-platform"
+	DefaultAudience    = "https://oauth2.googleapis.com/token"
+	DefaultLifetimeSec = 3600
 )
 
 type Minter struct {
@@ -123,7 +125,7 @@ func validateTokenParams(typ Type, audience string, scopes []string) (_ string, 
 		} else if len(scopes) == 0 {
 			scopes = []string{DefaultScope}
 		}
-		audience = "https://oauth2.googleapis.com/token"
+		audience = DefaultAudience
 	case IDToken:
 		if audience == "" {
 			err = fmt.Errorf("%w: audience is required for ID tokens", ErrInvalidParams)
@@ -175,7 +177,7 @@ func signJWT(sign crypto.Signer, iss, aud string, scopes []string) (string, erro
 		return "", err
 	}
 
-	c := jwtClaims{iss, aud, now, now + 3600, strings.Join(scopes, " ")}
+	c := jwtClaims{iss, aud, now, now + DefaultLifetimeSec, strings.Join(scopes, " ")}
 	claims, err := json.Marshal(c)
 	if err != nil {
 		return "", err

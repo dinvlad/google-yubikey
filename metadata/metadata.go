@@ -38,7 +38,7 @@ func Serve(serial uint, slot piv.Slot, email *mail.Address, projectNum uint64, s
 	saMux.HandleFunc("GET /{$}", s.saDefaultHandler)
 	saMux.HandleFunc("GET /email", s.saEmailHandler)
 	saMux.HandleFunc("GET /identity", s.saIdentityHandler)
-	saMux.HandleFunc("GET /token", saTokenHandler)
+	saMux.HandleFunc("GET /token", s.saTokenHandler)
 	mux.HandleFunc(metaRootSa+"/", s.saHandler)
 	mux.Handle(metaRootSaDefault+"/", http.StripPrefix(metaRootSaDefault, saMux))
 
@@ -102,8 +102,27 @@ func (s server) saEmailHandler(w http.ResponseWriter, r *http.Request) {
 	io.WriteString(w, s.email.Address)
 }
 
-func saTokenHandler(w http.ResponseWriter, r *http.Request) {
-	handleNotImplemented(w)
+type accessTokenResponse struct {
+	AccessToken string `json:"access_token"`
+	ExpiresIn   int    `json:"expires_in"`
+	TokenType   string `json:"token_type"`
+}
+
+func (s server) saTokenHandler(w http.ResponseWriter, r *http.Request) {
+	scopes := s.scopes
+	if q := r.URL.Query().Get("scopes"); q != "" {
+		scopes = strings.Split(q, ",")
+	}
+	tok, err := s.m.Generate(token.AccessToken, "", scopes)
+	if errors.Is(err, token.ErrInvalidParams) {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	} else if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	setContentTypeJSON(w)
+	json.MarshalWrite(w, &accessTokenResponse{tok, token.DefaultLifetimeSec, "Bearer"})
 }
 
 func (s server) saIdentityHandler(w http.ResponseWriter, r *http.Request) {
