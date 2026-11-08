@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dinvlad/google-yubikey/v2/yubikey"
 	"github.com/go-piv/piv-go/v2/piv"
 )
 
@@ -43,7 +44,7 @@ func generateToken(serial uint, account string, typ tokenType, audience string, 
 		return "", fmt.Errorf(`unknown token type %q: must be "%s" or "%s"`, typ, AccessToken, IDToken)
 	}
 
-	yk, err := open(serial)
+	yk, err := yubikey.Open(serial)
 	if err != nil {
 		return "", err
 	}
@@ -75,9 +76,8 @@ func signer(yk *piv.YubiKey) (crypto.Signer, error) {
 	if err != nil {
 		return nil, fmt.Errorf("reading key info: %w", err)
 	}
-	touchPolicy = info.TouchPolicy
 
-	return privateKey(yk, cert.PublicKey, info.PINPolicy)
+	return yubikey.PrivateKey(yk, slot, cert.PublicKey, info.PINPolicy, info.TouchPolicy)
 }
 
 type jwtHeader struct {

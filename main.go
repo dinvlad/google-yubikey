@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/dinvlad/google-yubikey/v2/metadata"
+	"github.com/dinvlad/google-yubikey/v2/yubikey"
 	"github.com/go-piv/piv-go/v2/piv"
 )
 
@@ -77,7 +78,7 @@ func main() {
 	var err error
 	switch cmd {
 	case "generate-key":
-		err = generateKey(*serial, *subject, *validDays)
+		err = yubikey.GenerateKey(*serial, slot, *subject, *validDays, pinPolicy, touchPolicy)
 	case "token":
 		if err = requireAccount(fs); err != nil {
 			break

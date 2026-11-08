@@ -1,4 +1,4 @@
-package main
+package yubikey
 
 import (
 	"crypto"
@@ -18,10 +18,13 @@ import (
 	"golang.org/x/term"
 )
 
-// generateKey creates a new key and self-signed certificate on the YubiKey
+// GenerateKey creates a new key and self-signed certificate on the YubiKey
 // replacing any existing key, and prints the certificate as PEM.
-func generateKey(serial uint, subject string, validDays int) error {
-	yk, err := open(serial)
+func GenerateKey(
+	serial uint, slot piv.Slot, subject string,
+	validDays int, pp piv.PINPolicy, tp piv.TouchPolicy,
+) error {
+	yk, err := Open(serial)
 	if err != nil {
 		return err
 	}
@@ -42,14 +45,14 @@ func generateKey(serial uint, subject string, validDays int) error {
 
 	pub, err := yk.GenerateKey(mgmt, slot, piv.Key{
 		Algorithm:   piv.AlgorithmRSA2048,
-		PINPolicy:   pinPolicy,
-		TouchPolicy: touchPolicy,
+		PINPolicy:   pp,
+		TouchPolicy: tp,
 	})
 	if err != nil {
 		return err
 	}
 
-	sign, err := privateKey(yk, pub, pinPolicy)
+	sign, err := PrivateKey(yk, slot, pub, pp, tp)
 	if err != nil {
 		return err
 	}
@@ -64,9 +67,9 @@ func generateKey(serial uint, subject string, validDays int) error {
 	return pem.Encode(os.Stdout, &pem.Block{Type: "CERTIFICATE", Bytes: cert.Raw})
 }
 
-// open returns the YubiKey with the given serial,
+// Open returns the YubiKey with the given serial,
 // or the first one when serial is 0.
-func open(serial uint) (*piv.YubiKey, error) {
+func Open(serial uint) (*piv.YubiKey, error) {
 	cards, err := piv.Cards()
 	if err != nil {
 		return nil, err
@@ -113,25 +116,27 @@ func promptManagementKey() ([]byte, error) {
 	return key, nil
 }
 
-// promptPIN reads the PIV PIN without echo.
-func promptPIN() (string, error) {
-	fmt.Fprint(os.Stderr, "Enter PIN: ")
-	b, err := term.ReadPassword(int(os.Stdin.Fd()))
-	fmt.Fprintln(os.Stderr)
-	if err != nil {
-		return "", err
+// pinPrompt reads the PIV PIN without echo.
+func pinPrompt(tp piv.TouchPolicy) func() (string, error) {
+	return func() (string, error) {
+		fmt.Fprint(os.Stderr, "Enter PIN: ")
+		b, err := term.ReadPassword(int(os.Stdin.Fd()))
+		fmt.Fprintln(os.Stderr)
+		if err != nil {
+			return "", err
+		}
+		if tp != piv.TouchPolicyNever {
+			fmt.Fprintln(os.Stderr, "Touch your YubiKey...")
+		}
+		return strings.TrimSpace(string(b)), nil
 	}
-	if touchPolicy != piv.TouchPolicyNever {
-		fmt.Fprintln(os.Stderr, "Touch your YubiKey...")
-	}
-	return strings.TrimSpace(string(b)), nil
 }
 
-// privateKey returns a signer for the private key, prompting for the PIN when needed.
-func privateKey(yk *piv.YubiKey, pub crypto.PublicKey, pp piv.PINPolicy) (crypto.Signer, error) {
+// PrivateKey returns a signer for the private key, prompting for the PIN when needed.
+func PrivateKey(yk *piv.YubiKey, slot piv.Slot, pub crypto.PublicKey, pp piv.PINPolicy, tp piv.TouchPolicy) (crypto.Signer, error) {
 	priv, err := yk.PrivateKey(slot, pub, piv.KeyAuth{
 		PINPolicy: pp,
-		PINPrompt: promptPIN,
+		PINPrompt: pinPrompt(tp),
 	})
 	if err != nil {
 		return nil, err
