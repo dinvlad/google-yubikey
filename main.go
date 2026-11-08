@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/dinvlad/google-yubikey/v2/metadata"
+	"github.com/dinvlad/google-yubikey/v2/token"
 	"github.com/dinvlad/google-yubikey/v2/yubikey"
 	"github.com/go-piv/piv-go/v2/piv"
 )
@@ -84,7 +85,7 @@ func main() {
 			break
 		}
 		var tok string
-		if tok, err = generateToken(*serial, *account, tokenType(*tokType), *audience, scopes); err == nil {
+		if tok, err = token.Generate(*serial, slot, *account, token.Type(*tokType), *audience, scopes); err == nil {
 			fmt.Println(tok)
 		}
 	case "serve":

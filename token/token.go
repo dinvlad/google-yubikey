@@ -1,4 +1,4 @@
-package main
+package token
 
 import (
 	"crypto"
@@ -17,15 +17,15 @@ import (
 	"github.com/go-piv/piv-go/v2/piv"
 )
 
-type tokenType string
+type Type string
 
 const (
-	IDToken     tokenType = "id"
-	AccessToken tokenType = "access"
+	IDToken     Type = "id"
+	AccessToken Type = "access"
 )
 
 // generateToken creates an access or ID token for the service account.
-func generateToken(serial uint, account string, typ tokenType, audience string, scopes []string) (string, error) {
+func Generate(serial uint, slot piv.Slot, account string, typ Type, audience string, scopes []string) (string, error) {
 	switch typ {
 	case AccessToken:
 		if audience != "" {
@@ -50,7 +50,7 @@ func generateToken(serial uint, account string, typ tokenType, audience string, 
 	}
 	defer yk.Close()
 
-	sign, err := signer(yk)
+	sign, err := signer(yk, slot)
 	if err != nil {
 		return "", err
 	}
@@ -66,7 +66,7 @@ func generateToken(serial uint, account string, typ tokenType, audience string, 
 }
 
 // signer reads the slot's certificate and policies and returns a signer for its key.
-func signer(yk *piv.YubiKey) (crypto.Signer, error) {
+func signer(yk *piv.YubiKey, slot piv.Slot) (crypto.Signer, error) {
 	cert, err := yk.Certificate(slot)
 	if err != nil {
 		return nil, fmt.Errorf("reading certificate: %w", err)
