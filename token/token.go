@@ -131,6 +131,19 @@ func (m *Minter) getSigner() (s crypto.Signer, err error) {
 	return m.signer, err
 }
 
+// signer reads the slot's certificate and policies and returns a signer for its key.
+func signer(yk *piv.YubiKey, slot piv.Slot) (crypto.Signer, error) {
+	cert, err := yk.Certificate(slot)
+	if err != nil {
+		return nil, fmt.Errorf("reading certificate: %w", err)
+	}
+	info, err := yk.KeyInfo(slot)
+	if err != nil {
+		return nil, fmt.Errorf("reading key info: %w", err)
+	}
+	return yubikey.PrivateKey(yk, slot, cert.PublicKey, info.PINPolicy, info.TouchPolicy)
+}
+
 var ErrInvalidParams = errors.New("invalid token parameters")
 
 func validateTokenParams(typ Type, audience string, scopes []string) (_ string, _ []string, err error) {
@@ -155,21 +168,6 @@ func validateTokenParams(typ Type, audience string, scopes []string) (_ string, 
 		err = fmt.Errorf(`%w: unknown token type %q: must be "%s" or "%s"`, ErrInvalidParams, typ, AccessToken, IDToken)
 	}
 	return audience, scopes, err
-}
-
-// signer reads the slot's certificate and policies and returns a signer for its key.
-func signer(yk *piv.YubiKey, slot piv.Slot) (crypto.Signer, error) {
-	cert, err := yk.Certificate(slot)
-	if err != nil {
-		return nil, fmt.Errorf("reading certificate: %w", err)
-	}
-
-	info, err := yk.KeyInfo(slot)
-	if err != nil {
-		return nil, fmt.Errorf("reading key info: %w", err)
-	}
-
-	return yubikey.PrivateKey(yk, slot, cert.PublicKey, info.PINPolicy, info.TouchPolicy)
 }
 
 type jwtHeader struct {
