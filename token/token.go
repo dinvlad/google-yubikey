@@ -124,7 +124,10 @@ func (m *Minter) getSigner() (s crypto.Signer, err error) {
 	if m.yk, err = yubikey.Open(m.serial); err != nil {
 		return
 	}
-	m.signer, err = signer(m.yk, m.slot)
+	if m.signer, err = signer(m.yk, m.slot); err != nil {
+		m.yk.Close()
+		m.yk = nil
+	}
 	return m.signer, err
 }
 
