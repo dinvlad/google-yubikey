@@ -28,7 +28,7 @@ var (
 	audience *string
 	scopes   []string
 
-	nProjectID *uint64
+	projectNum *uint64
 	addr       *string
 )
 
@@ -63,7 +63,7 @@ func main() {
 			`(default: "https://www.googleapis.com/auth/cloud-platform")`, parseScopes)
 	case "serve":
 		account = fs.String("account", "", "Service Account email (required)")
-		nProjectID = fs.Uint64("numeric-project-id", 0, "numeric project id")
+		projectNum = fs.Uint64("project-number", 0, "Google project number")
 		addr = fs.String("addr", "127.0.0.1:1692", "listen address")
 	case "-h", "-help", "--help":
 		fs.Usage()
@@ -92,7 +92,7 @@ func main() {
 		if err = requireAccount(fs); err != nil {
 			break
 		}
-		err = metadata.Serve(*serial, slot, *account, *nProjectID, *addr)
+		err = metadata.Serve(*serial, slot, *account, *projectNum, *addr)
 	}
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)

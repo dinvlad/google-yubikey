@@ -2,7 +2,9 @@ package metadata
 
 import (
 	"fmt"
+	"io"
 	"net/http"
+	"strconv"
 
 	"github.com/go-piv/piv-go/v2/piv"
 )
@@ -17,7 +19,15 @@ const (
 	metaFlavorValue  = "Google"
 )
 
-func Serve(serial uint, slot piv.Slot, account string, nProjectID uint64, addr string) error {
+type server struct {
+	projectNum string
+}
+
+func Serve(serial uint, slot piv.Slot, account string, projectNum uint64, addr string) error {
+	s := server{
+		projectNum: strconv.FormatUint(projectNum, 10),
+	}
+
 	mux := http.NewServeMux()
 
 	saMux := http.NewServeMux()
@@ -30,7 +40,7 @@ func Serve(serial uint, slot piv.Slot, account string, nProjectID uint64, addr s
 
 	pMux := http.NewServeMux()
 	pMux.HandleFunc("GET /project-id", projectIDHandler)
-	pMux.HandleFunc("GET /numeric-project-id", numericProjectIDHandler)
+	pMux.HandleFunc("GET /numeric-project-id", s.projectNumHandler)
 	mux.Handle(metaRootProject+"/", http.StripPrefix(metaRootProject, pMux))
 
 	return http.ListenAndServe(addr, metaHeaders(mux))
@@ -60,8 +70,8 @@ func projectIDHandler(w http.ResponseWriter, r *http.Request) {
 	handleNotImplemented(w)
 }
 
-func numericProjectIDHandler(w http.ResponseWriter, r *http.Request) {
-	handleNotImplemented(w)
+func (s server) projectNumHandler(w http.ResponseWriter, r *http.Request) {
+	io.WriteString(w, s.projectNum)
 }
 
 func handleNotImplemented(w http.ResponseWriter) {
