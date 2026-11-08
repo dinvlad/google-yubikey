@@ -14,8 +14,9 @@ import (
 const (
 	metaRoot          = "/computeMetadata/v1"
 	metaRootSa        = metaRoot + "/instance/service-accounts"
-	metaRootSaDefault = metaRootSa + "/default"
+	metaRootSaDefault = metaRootSa + "/" + metaDefaultAlias
 	metaRootProject   = metaRoot + "/project"
+	metaDefaultAlias  = "default"
 
 	metaFlavorHeader = "Metadata-Flavor"
 	metaFlavorValue  = "Google"
@@ -45,8 +46,8 @@ func Serve(serial uint, slot piv.Slot, account string, projectNum uint64, scopes
 	saMux.HandleFunc("GET /email", s.saEmailHandler)
 	saMux.HandleFunc("GET /identity", saIdentityHandler)
 	saMux.HandleFunc("GET /token", saTokenHandler)
+	mux.HandleFunc(metaRootSa+"/", s.saHandler)
 	mux.Handle(metaRootSaDefault+"/", http.StripPrefix(metaRootSaDefault, saMux))
-	mux.HandleFunc(metaRootSa+"/", saHandler)
 
 	pMux := http.NewServeMux()
 	pMux.HandleFunc("GET /project-id", projectIDHandler)
@@ -56,8 +57,8 @@ func Serve(serial uint, slot piv.Slot, account string, projectNum uint64, scopes
 	return http.ListenAndServe(addr, metaHeaders(mux))
 }
 
-func saHandler(w http.ResponseWriter, r *http.Request) {
-	handleNotImplemented(w)
+func (s server) saHandler(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprintf(w, "%s/\n%s/\n", metaDefaultAlias, s.email)
 }
 
 type saDefault struct {
@@ -73,7 +74,7 @@ func (s server) saDefaultHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	setContentTypeJSON(w)
 	if err := json.MarshalWrite(w, &saDefault{
-		Aliases: []string{"default"},
+		Aliases: []string{metaDefaultAlias},
 		Email:   s.email,
 		Scopes:  s.scopes,
 	}); err != nil {
