@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/mail"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -109,10 +110,28 @@ type accessTokenResponse struct {
 }
 
 func (s server) saTokenHandler(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
 	scopes := s.scopes
-	if q := r.URL.Query().Get("scopes"); q != "" {
-		scopes = strings.Split(q, ",")
+	switch strings.ToLower(q.Get("enforce_scopes")) {
+	case "":
+	case "true", "1", "yes", "y":
+		scopes = strings.Split(q.Get("scopes"), ",")
+		for i, sc := range scopes {
+			sc = strings.TrimSpace(sc)
+			scopes[i] = sc
+			if !slices.Contains(s.scopes, sc) {
+				http.Error(w, "scopes must be a subset of instance scopes", http.StatusBadRequest)
+				return
+			}
+		}
+	case "false", "0", "no", "n":
+		http.Error(w, "enforce_scopes=false is not supported", http.StatusBadRequest)
+		return
+	default:
+		http.Error(w, "invalid enforce_scopes value", http.StatusBadRequest)
+		return
 	}
+
 	tok, err := s.m.Generate(token.AccessToken, "", scopes)
 	if errors.Is(err, token.ErrInvalidParams) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
