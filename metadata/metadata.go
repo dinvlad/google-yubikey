@@ -24,31 +24,19 @@ const (
 	metaFlavorValue  = "Google"
 )
 
-type server struct {
-	email      *mail.Address
-	projectID  string
-	projectNum string
-	scopes     []string
-}
-
-func Serve(serial uint, slot piv.Slot, email *mail.Address, projectNum uint64, scopes []string, addr string) error {
-	if len(scopes) == 0 {
-		scopes = []string{token.DefaultScope}
+func Serve(serial uint, slot piv.Slot, email *mail.Address, projectNum uint64, scopes []string, addr string) (err error) {
+	s, err := newServer(serial, slot, email, projectNum, scopes)
+	if err != nil {
+		return
 	}
-
-	s := server{
-		email:      email,
-		projectID:  strings.Split(strings.Split(email.Address, "@")[1], ".")[0],
-		projectNum: strconv.FormatUint(projectNum, 10),
-		scopes:     scopes,
-	}
+	defer s.m.Close()
 
 	mux := http.NewServeMux()
 
 	saMux := http.NewServeMux()
 	saMux.HandleFunc("GET /{$}", s.saDefaultHandler)
 	saMux.HandleFunc("GET /email", s.saEmailHandler)
-	saMux.HandleFunc("GET /identity", saIdentityHandler)
+	saMux.HandleFunc("GET /identity", s.saIdentityHandler)
 	saMux.HandleFunc("GET /token", saTokenHandler)
 	mux.HandleFunc(metaRootSa+"/", s.saHandler)
 	mux.Handle(metaRootSaDefault+"/", http.StripPrefix(metaRootSaDefault, saMux))
@@ -59,6 +47,28 @@ func Serve(serial uint, slot piv.Slot, email *mail.Address, projectNum uint64, s
 	mux.Handle(metaRootProject+"/", http.StripPrefix(metaRootProject, pMux))
 
 	return http.ListenAndServe(addr, metaHeaders(mux))
+}
+
+type server struct {
+	email      *mail.Address
+	projectID  string
+	projectNum string
+	scopes     []string
+	m          *token.Minter
+}
+
+func newServer(serial uint, slot piv.Slot, email *mail.Address, projectNum uint64, scopes []string) (s server, err error) {
+	if len(scopes) == 0 {
+		scopes = []string{token.DefaultScope}
+	}
+	s = server{
+		email:      email,
+		projectID:  strings.Split(strings.Split(email.Address, "@")[1], ".")[0],
+		projectNum: strconv.FormatUint(projectNum, 10),
+		scopes:     scopes,
+	}
+	s.m, err = token.NewMinter(serial, slot, email)
+	return
 }
 
 func (s server) saHandler(w http.ResponseWriter, r *http.Request) {
@@ -95,8 +105,19 @@ func saTokenHandler(w http.ResponseWriter, r *http.Request) {
 	handleNotImplemented(w)
 }
 
-func saIdentityHandler(w http.ResponseWriter, r *http.Request) {
-	handleNotImplemented(w)
+func (s server) saIdentityHandler(w http.ResponseWriter, r *http.Request) {
+	aud := r.URL.Query().Get("audience")
+	aud, _, err := token.ValidateTokenParams(token.IDToken, aud, nil)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	token, err := s.m.Generate(token.IDToken, aud, nil)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	io.WriteString(w, token)
 }
 
 func (s server) projectIDHandler(w http.ResponseWriter, r *http.Request) {
