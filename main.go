@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/dinvlad/google-yubikey/v2/metadata"
 	"github.com/go-piv/piv-go/v2/piv"
 )
 
@@ -89,7 +90,7 @@ func main() {
 		if err = requireAccount(fs); err != nil {
 			break
 		}
-		err = serve(*account, *nProjectID, *addr)
+		err = metadata.Serve(*serial, slot, *account, *nProjectID, *addr)
 	}
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)

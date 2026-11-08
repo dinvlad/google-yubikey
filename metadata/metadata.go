@@ -1,6 +1,10 @@
-package main
+package metadata
 
-import "net/http"
+import (
+	"net/http"
+
+	"github.com/go-piv/piv-go/v2/piv"
+)
 
 const (
 	metaRoot          = "/computeMetadata/v1"
@@ -11,7 +15,7 @@ const (
 	metaHeader = "Metadata-Flavor"
 )
 
-func serve(account string, nProjectID uint64, addr string) error {
+func Serve(serial uint, slot piv.Slot, account string, nProjectID uint64, addr string) error {
 	mux := http.NewServeMux()
 
 	saMux := http.NewServeMux()
