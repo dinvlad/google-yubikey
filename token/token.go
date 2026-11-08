@@ -70,12 +70,10 @@ func (m *Minter) Close() {
 }
 
 func (m *Minter) worker() {
-	for {
-		for p := range m.params {
-			token, err := m.mint(p.typ, p.audience, p.scopes)
-			p.result <- tokenResult{token, err}
-			close(p.result)
-		}
+	for p := range m.params {
+		token, err := m.mint(p.typ, p.audience, p.scopes)
+		p.result <- tokenResult{token, err}
+		close(p.result)
 	}
 }
 
