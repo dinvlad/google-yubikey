@@ -1,6 +1,7 @@
 package metadata
 
 import (
+	"encoding/json/v2"
 	"fmt"
 	"io"
 	"net/http"
@@ -40,7 +41,7 @@ func Serve(serial uint, slot piv.Slot, account string, projectNum uint64, scopes
 	mux := http.NewServeMux()
 
 	saMux := http.NewServeMux()
-	saMux.HandleFunc("GET /{$}", saDefaultHandler)
+	saMux.HandleFunc("GET /{$}", s.saDefaultHandler)
 	saMux.HandleFunc("GET /email", s.saEmailHandler)
 	saMux.HandleFunc("GET /identity", saIdentityHandler)
 	saMux.HandleFunc("GET /token", saTokenHandler)
@@ -59,8 +60,26 @@ func saHandler(w http.ResponseWriter, r *http.Request) {
 	handleNotImplemented(w)
 }
 
-func saDefaultHandler(w http.ResponseWriter, r *http.Request) {
-	handleNotImplemented(w)
+type saDefault struct {
+	Aliases []string `json:"aliases"`
+	Email   string   `json:"email"`
+	Scopes  []string `json:"scopes"`
+}
+
+func (s server) saDefaultHandler(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Query().Get("recursive") != "true" {
+		handleNotImplemented(w)
+		return
+	}
+	setContentTypeJSON(w)
+	if err := json.MarshalWrite(w, &saDefault{
+		Aliases: []string{"default"},
+		Email:   s.email,
+		Scopes:  s.scopes,
+	}); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 }
 
 func (s server) saEmailHandler(w http.ResponseWriter, r *http.Request) {
@@ -85,6 +104,10 @@ func (s server) projectNumHandler(w http.ResponseWriter, r *http.Request) {
 
 func handleNotImplemented(w http.ResponseWriter) {
 	http.Error(w, "501 Not Implemented", http.StatusNotImplemented)
+}
+
+func setContentTypeJSON(w http.ResponseWriter) {
+	w.Header().Set("Content-Type", "application/json")
 }
 
 func metaHeaders(next http.Handler) http.Handler {
