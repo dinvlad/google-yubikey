@@ -5,6 +5,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"net/mail"
 	"os"
 	"strings"
 
@@ -24,6 +25,7 @@ var (
 	validDays *int
 
 	account  *string
+	email    *mail.Address
 	tokType  *string
 	audience *string
 	scopes   []string
@@ -81,18 +83,18 @@ func main() {
 	case "generate-key":
 		err = yubikey.GenerateKey(*serial, slot, *subject, *validDays, pinPolicy, touchPolicy)
 	case "token":
-		if err = requireAccount(fs); err != nil {
+		if err = requireSAEmail(fs, *account); err != nil {
 			break
 		}
 		var tok string
-		if tok, err = token.Generate(*serial, slot, *account, token.Type(*tokType), *audience, scopes); err == nil {
+		if tok, err = token.Generate(*serial, slot, email, token.Type(*tokType), *audience, scopes); err == nil {
 			fmt.Println(tok)
 		}
 	case "serve":
-		if err = requireAccount(fs); err != nil {
+		if err = requireSAEmail(fs, *account); err != nil {
 			break
 		}
-		err = metadata.Serve(*serial, slot, *account, *projectNum, scopes, *addr)
+		err = metadata.Serve(*serial, slot, email, *projectNum, scopes, *addr)
 	}
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -165,10 +167,11 @@ func parseScopes(fs *flag.FlagSet) {
 	})
 }
 
-func requireAccount(fs *flag.FlagSet) error {
-	if *account == "" {
+func requireSAEmail(fs *flag.FlagSet, account string) (err error) {
+	email, err = mail.ParseAddress(account)
+	if err != nil || !strings.HasSuffix(account, ".iam.gserviceaccount.com") {
 		fs.Usage()
-		return errors.New("Error: Service Account email is required")
+		return errors.New("Error: a valid Service Account email is required")
 	}
 	return nil
 }

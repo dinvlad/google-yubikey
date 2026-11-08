@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/mail"
 	"net/url"
 	"strings"
 	"time"
@@ -27,7 +28,7 @@ const (
 )
 
 // generateToken creates an access or ID token for the service account.
-func Generate(serial uint, slot piv.Slot, account string, typ Type, audience string, scopes []string) (string, error) {
+func Generate(serial uint, slot piv.Slot, email *mail.Address, typ Type, audience string, scopes []string) (string, error) {
 	switch typ {
 	case AccessToken:
 		if audience != "" {
@@ -57,7 +58,7 @@ func Generate(serial uint, slot piv.Slot, account string, typ Type, audience str
 		return "", err
 	}
 
-	jwt, err := signJWT(sign, account, audience, scopes)
+	jwt, err := signJWT(sign, email.Address, audience, scopes)
 	if err != nil {
 		return "", err
 	}

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/mail"
 	"strconv"
 	"strings"
 
@@ -24,20 +25,20 @@ const (
 )
 
 type server struct {
-	email      string
+	email      *mail.Address
 	projectID  string
 	projectNum string
 	scopes     []string
 }
 
-func Serve(serial uint, slot piv.Slot, email string, projectNum uint64, scopes []string, addr string) error {
+func Serve(serial uint, slot piv.Slot, email *mail.Address, projectNum uint64, scopes []string, addr string) error {
 	if len(scopes) == 0 {
 		scopes = []string{token.DefaultScope}
 	}
 
 	s := server{
 		email:      email,
-		projectID:  strings.Split(strings.Split(email, "@")[1], ".")[0],
+		projectID:  strings.Split(strings.Split(email.Address, "@")[1], ".")[0],
 		projectNum: strconv.FormatUint(projectNum, 10),
 		scopes:     scopes,
 	}
@@ -61,7 +62,7 @@ func Serve(serial uint, slot piv.Slot, email string, projectNum uint64, scopes [
 }
 
 func (s server) saHandler(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, "%s/\n%s/\n", metaDefaultAlias, s.email)
+	fmt.Fprintf(w, "%s/\n%s/\n", metaDefaultAlias, s.email.Address)
 }
 
 type saDefault struct {
@@ -78,7 +79,7 @@ func (s server) saDefaultHandler(w http.ResponseWriter, r *http.Request) {
 	setContentTypeJSON(w)
 	if err := json.MarshalWrite(w, &saDefault{
 		Aliases: []string{metaDefaultAlias},
-		Email:   s.email,
+		Email:   s.email.Address,
 		Scopes:  s.scopes,
 	}); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -87,7 +88,7 @@ func (s server) saDefaultHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s server) saEmailHandler(w http.ResponseWriter, r *http.Request) {
-	io.WriteString(w, s.email)
+	io.WriteString(w, s.email.Address)
 }
 
 func saTokenHandler(w http.ResponseWriter, r *http.Request) {
