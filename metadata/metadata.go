@@ -1,6 +1,7 @@
 package metadata
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/go-piv/piv-go/v2/piv"
@@ -12,7 +13,8 @@ const (
 	metaRootSaDefault = metaRootSa + "/default"
 	metaRootProject   = metaRoot + "/project"
 
-	metaHeader = "Metadata-Flavor"
+	metaFlavorHeader = "Metadata-Flavor"
+	metaFlavorValue  = "Google"
 )
 
 func Serve(serial uint, slot piv.Slot, account string, nProjectID uint64, addr string) error {
@@ -31,7 +33,7 @@ func Serve(serial uint, slot piv.Slot, account string, nProjectID uint64, addr s
 	pMux.HandleFunc("GET /numeric-project-id", numericProjectIDHandler)
 	mux.Handle(metaRootProject+"/", http.StripPrefix(metaRootProject, pMux))
 
-	return http.ListenAndServe(addr, requireMetaHeader(mux))
+	return http.ListenAndServe(addr, metaHeaders(mux))
 }
 
 func saHandler(w http.ResponseWriter, r *http.Request) {
@@ -66,12 +68,18 @@ func handleNotImplemented(w http.ResponseWriter) {
 	http.Error(w, "501 Not Implemented", http.StatusNotImplemented)
 }
 
-func requireMetaHeader(next http.Handler) http.Handler {
+func metaHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Header.Get(metaHeader) != "Google" {
-			http.Error(w, metaHeader+" header is required", http.StatusUnauthorized)
+		if r.Header.Get(metaFlavorHeader) != metaFlavorValue {
+			err := fmt.Errorf("Missing %s:%s header.", metaFlavorHeader, metaFlavorValue)
+			http.Error(w, err.Error(), http.StatusUnauthorized)
 			return
 		}
+		h := w.Header()
+		h.Set(metaFlavorHeader, metaFlavorValue)
+		h.Set("Server", "Metadata Server for VM")
+		h.Set("X-Frame-Options", "SAMEORIGIN")
+		h.Set("X-XSS-Protection", "1")
 		next.ServeHTTP(w, r)
 	})
 }
