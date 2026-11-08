@@ -27,38 +27,67 @@ const (
 	DefaultScope = "https://www.googleapis.com/auth/cloud-platform"
 )
 
-// generateToken creates an access or ID token for the service account.
-func Generate(serial uint, slot piv.Slot, email *mail.Address, typ Type, audience string, scopes []string) (string, error) {
-	switch typ {
-	case AccessToken:
-		if audience != "" {
-			return "", errors.New("custom audience is not supported for access tokens")
-		} else if len(scopes) == 0 {
-			scopes = []string{DefaultScope}
-		}
-		audience = "https://oauth2.googleapis.com/token"
-	case IDToken:
-		if audience == "" {
-			return "", errors.New("audience is required for ID tokens")
-		} else if len(scopes) > 0 {
-			return "", errors.New("scopes are not supported for ID tokens")
-		}
-	default:
-		return "", fmt.Errorf(`unknown token type %q: must be "%s" or "%s"`, typ, AccessToken, IDToken)
-	}
+type Minter struct {
+	email  *mail.Address
+	yk     *piv.YubiKey
+	signer crypto.Signer
+	params chan tokenParams
+}
 
-	yk, err := yubikey.Open(serial)
+type tokenParams struct {
+	typ      Type
+	audience string
+	scopes   []string
+	result   chan tokenResult
+}
+
+type tokenResult struct {
+	token string
+	err   error
+}
+
+func NewMinter(serial uint, slot piv.Slot, email *mail.Address) (m *Minter, err error) {
+	m = &Minter{
+		email:  email,
+		params: make(chan tokenParams),
+	}
+	m.yk, err = yubikey.Open(serial)
 	if err != nil {
-		return "", err
+		return
 	}
-	defer yk.Close()
-
-	sign, err := signer(yk, slot)
-	if err != nil {
-		return "", err
+	if m.signer, err = signer(m.yk, slot); err != nil {
+		return
 	}
+	go m.worker()
+	return
+}
 
-	jwt, err := signJWT(sign, email.Address, audience, scopes)
+func (m *Minter) Close() {
+	if m.yk != nil {
+		m.yk.Close()
+	}
+	close(m.params)
+}
+
+func (m *Minter) worker() {
+	for {
+		for p := range m.params {
+			token, err := m.mint(p.typ, p.audience, p.scopes)
+			p.result <- tokenResult{token, err}
+			close(p.result)
+		}
+	}
+}
+
+func (m *Minter) Generate(typ Type, audience string, scopes []string) (string, error) {
+	results := make(chan tokenResult)
+	m.params <- tokenParams{typ, audience, scopes, results}
+	r := <-results
+	return r.token, r.err
+}
+
+func (m *Minter) mint(typ Type, audience string, scopes []string) (string, error) {
+	jwt, err := signJWT(m.signer, m.email.Address, audience, scopes)
 	if err != nil {
 		return "", err
 	}
@@ -66,6 +95,30 @@ func Generate(serial uint, slot piv.Slot, email *mail.Address, typ Type, audienc
 		return jwt, nil
 	}
 	return accessToken(jwt)
+}
+
+func ValidateTokenParams(typ Type, audience string, scopes []string) (_ string, _ []string, err error) {
+	switch typ {
+	case AccessToken:
+		if audience != "" {
+			err = errors.New("custom audience is not supported for access tokens")
+			return
+		} else if len(scopes) == 0 {
+			scopes = []string{DefaultScope}
+		}
+		audience = "https://oauth2.googleapis.com/token"
+	case IDToken:
+		if audience == "" {
+			err = errors.New("audience is required for ID tokens")
+			return
+		} else if len(scopes) > 0 {
+			err = errors.New("scopes are not supported for ID tokens")
+			return
+		}
+	default:
+		err = fmt.Errorf(`unknown token type %q: must be "%s" or "%s"`, typ, AccessToken, IDToken)
+	}
+	return audience, scopes, err
 }
 
 // signer reads the slot's certificate and policies and returns a signer for its key.
