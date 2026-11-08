@@ -20,11 +20,13 @@ const (
 )
 
 type server struct {
+	email      string
 	projectNum string
 }
 
 func Serve(serial uint, slot piv.Slot, account string, projectNum uint64, addr string) error {
 	s := server{
+		email:      account,
 		projectNum: strconv.FormatUint(projectNum, 10),
 	}
 
@@ -32,7 +34,7 @@ func Serve(serial uint, slot piv.Slot, account string, projectNum uint64, addr s
 
 	saMux := http.NewServeMux()
 	saMux.HandleFunc("GET /{$}", saDefaultHandler)
-	saMux.HandleFunc("GET /email", saEmailHandler)
+	saMux.HandleFunc("GET /email", s.saEmailHandler)
 	saMux.HandleFunc("GET /identity", saIdentityHandler)
 	saMux.HandleFunc("GET /token", saTokenHandler)
 	mux.Handle(metaRootSaDefault+"/", http.StripPrefix(metaRootSaDefault, saMux))
@@ -54,8 +56,8 @@ func saDefaultHandler(w http.ResponseWriter, r *http.Request) {
 	handleNotImplemented(w)
 }
 
-func saEmailHandler(w http.ResponseWriter, r *http.Request) {
-	handleNotImplemented(w)
+func (s server) saEmailHandler(w http.ResponseWriter, r *http.Request) {
+	io.WriteString(w, s.email)
 }
 
 func saTokenHandler(w http.ResponseWriter, r *http.Request) {
