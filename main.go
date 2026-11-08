@@ -86,18 +86,11 @@ func main() {
 		if err = requireSAEmail(fs, *account); err != nil {
 			break
 		}
-		typ := token.Type(*tokType)
-		audience, scopes, e := token.ValidateTokenParams(typ, *audience, scopes)
-		if e != nil {
-			err = e
-			break
-		}
-
 		var tok string
 		var m *token.Minter
 		m, err = token.NewMinter(*serial, slot, email)
 		if err == nil {
-			tok, err = m.Generate(typ, audience, scopes)
+			tok, err = m.Generate(token.Type(*tokType), *audience, scopes)
 		}
 		defer m.Close()
 		if err == nil {

@@ -28,6 +28,8 @@ const (
 )
 
 type Minter struct {
+	serial uint
+	slot   piv.Slot
 	email  *mail.Address
 	yk     *piv.YubiKey
 	signer crypto.Signer
@@ -48,15 +50,10 @@ type tokenResult struct {
 
 func NewMinter(serial uint, slot piv.Slot, email *mail.Address) (m *Minter, err error) {
 	m = &Minter{
+		serial: serial,
+		slot:   slot,
 		email:  email,
 		params: make(chan tokenParams),
-	}
-	m.yk, err = yubikey.Open(serial)
-	if err != nil {
-		return
-	}
-	if m.signer, err = signer(m.yk, slot); err != nil {
-		return
 	}
 	go m.worker()
 	return
@@ -85,7 +82,15 @@ func (m *Minter) Generate(typ Type, audience string, scopes []string) (string, e
 }
 
 func (m *Minter) mint(typ Type, audience string, scopes []string) (string, error) {
-	jwt, err := signJWT(m.signer, m.email.Address, audience, scopes)
+	audience, scopes, err := validateTokenParams(typ, audience, scopes)
+	if err != nil {
+		return "", err
+	}
+	s, err := m.getSigner()
+	if err != nil {
+		return "", err
+	}
+	jwt, err := signJWT(s, m.email.Address, audience, scopes)
 	if err != nil {
 		return "", err
 	}
@@ -95,11 +100,25 @@ func (m *Minter) mint(typ Type, audience string, scopes []string) (string, error
 	return accessToken(jwt)
 }
 
-func ValidateTokenParams(typ Type, audience string, scopes []string) (_ string, _ []string, err error) {
+func (m *Minter) getSigner() (s crypto.Signer, err error) {
+	s = m.signer
+	if s != nil {
+		return
+	}
+	if m.yk, err = yubikey.Open(m.serial); err != nil {
+		return
+	}
+	m.signer, err = signer(m.yk, m.slot)
+	return m.signer, err
+}
+
+var ErrInvalidParams = errors.New("invalid token parameters")
+
+func validateTokenParams(typ Type, audience string, scopes []string) (_ string, _ []string, err error) {
 	switch typ {
 	case AccessToken:
 		if audience != "" {
-			err = errors.New("custom audience is not supported for access tokens")
+			err = fmt.Errorf("%w: custom audience is not supported for access tokens", ErrInvalidParams)
 			return
 		} else if len(scopes) == 0 {
 			scopes = []string{DefaultScope}
@@ -107,14 +126,14 @@ func ValidateTokenParams(typ Type, audience string, scopes []string) (_ string, 
 		audience = "https://oauth2.googleapis.com/token"
 	case IDToken:
 		if audience == "" {
-			err = errors.New("audience is required for ID tokens")
+			err = fmt.Errorf("%w: audience is required for ID tokens", ErrInvalidParams)
 			return
 		} else if len(scopes) > 0 {
-			err = errors.New("scopes are not supported for ID tokens")
+			err = fmt.Errorf("%w: scopes are not supported for ID tokens", ErrInvalidParams)
 			return
 		}
 	default:
-		err = fmt.Errorf(`unknown token type %q: must be "%s" or "%s"`, typ, AccessToken, IDToken)
+		err = fmt.Errorf(`%w: unknown token type %q: must be "%s" or "%s"`, ErrInvalidParams, typ, AccessToken, IDToken)
 	}
 	return audience, scopes, err
 }

@@ -2,6 +2,7 @@ package metadata
 
 import (
 	"encoding/json/v2"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -106,18 +107,15 @@ func saTokenHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s server) saIdentityHandler(w http.ResponseWriter, r *http.Request) {
-	aud := r.URL.Query().Get("audience")
-	aud, _, err := token.ValidateTokenParams(token.IDToken, aud, nil)
-	if err != nil {
+	tok, err := s.m.Generate(token.IDToken, r.URL.Query().Get("audience"), nil)
+	if errors.Is(err, token.ErrInvalidParams) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
-	}
-	token, err := s.m.Generate(token.IDToken, aud, nil)
-	if err != nil {
+	} else if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	io.WriteString(w, token)
+	io.WriteString(w, tok)
 }
 
 func (s server) projectIDHandler(w http.ResponseWriter, r *http.Request) {
