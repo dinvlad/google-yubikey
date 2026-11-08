@@ -49,8 +49,7 @@ func Serve(serial uint, slot piv.Slot, email *mail.Address, projectNum uint64, s
 	pMux.HandleFunc("GET /numeric-project-id", s.projectNumHandler)
 	mux.Handle(metaRootProject+"/", http.StripPrefix(metaRootProject, pMux))
 
-	fmt.Printf("export GCE_METADATA_ROOT=%s\n", addr)
-	fmt.Printf("export GCE_METADATA_HOST=%s\n", addr)
+	fmt.Printf("export GCE_METADATA_ROOT=%s GCE_METADATA_HOST=%s\n", addr, addr)
 	return http.ListenAndServe(addr, metaHeaders(mux))
 }
 
